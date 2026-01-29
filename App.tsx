@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Users, Map as MapIcon, BarChart3, Info, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2 } from 'lucide-react';
-import PLZInput from './components/PLZInput.tsx';
-import GermanyMap from './components/GermanyMap.tsx';
-import { PLZEntry } from './types.ts';
-import { analyzeDistribution } from './services/gemini.ts';
-import * as sync from './services/syncService.ts';
+import PLZInput from './components/PLZInput';
+import GermanyMap from './components/GermanyMap';
+import { PLZEntry } from './types';
+import { analyzeDistribution } from './services/gemini';
+import * as sync from './services/syncService';
 
 const App: React.FC = () => {
   const [entries, setEntries] = useState<PLZEntry[]>([]);
@@ -19,7 +18,6 @@ const App: React.FC = () => {
   const entriesRef = useRef<PLZEntry[]>([]);
   entriesRef.current = entries;
 
-  // Initial Sync Connection
   useEffect(() => {
     if (config.url && config.key) {
       const client = sync.initSupabase(config.url, config.key);
@@ -28,7 +26,6 @@ const App: React.FC = () => {
         loadInitialData();
         
         const subscription = sync.subscribeToChanges((newEntry) => {
-          // Check if entry already exists locally (to avoid duplicates from own push)
           if (!entriesRef.current.some(e => e.id === newEntry.id)) {
             setEntries(prev => [newEntry, ...prev]);
             showToast(`${newEntry.nickname} aus ${newEntry.city} ist beigetreten!`);
@@ -40,7 +37,6 @@ const App: React.FC = () => {
         };
       }
     } else {
-      // Local Storage Fallback
       const saved = localStorage.getItem('plz-votes');
       if (saved) setEntries(JSON.parse(saved));
     }
@@ -65,8 +61,9 @@ const App: React.FC = () => {
         alert("Fehler beim Speichern in der Cloud. Prüfe deine Konfiguration.");
       }
     } else {
-      setEntries(prev => [entry, ...prev]);
-      localStorage.setItem('plz-votes', JSON.stringify([entry, ...entries]));
+      const newEntries = [entry, ...entries];
+      setEntries(newEntries);
+      localStorage.setItem('plz-votes', JSON.stringify(newEntries));
     }
   };
 
@@ -74,12 +71,11 @@ const App: React.FC = () => {
     e.preventDefault();
     sync.saveConfig(config.url, config.key);
     setShowSettings(false);
-    window.location.reload(); // Refresh to re-init sync
+    window.location.reload();
   };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
-      {/* Toast Notification */}
       {notification && (
         <div className="fixed top-20 right-4 z-[9999] animate-bounce-in">
           <div className="bg-blue-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-blue-400">
@@ -115,7 +111,6 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative">
@@ -127,11 +122,11 @@ const App: React.FC = () => {
               Live-Sync Setup
             </h3>
             <p className="text-gray-500 text-sm mb-6">
-              Verbinde das Tool mit einer Supabase-Instanz, um Standorte in Echtzeit mit deiner Discord-Gruppe zu teilen.
+              Verbinde das Tool mit Supabase (Realtime 'plz_entries' Tabelle erforderlich).
             </p>
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Supabase Project URL</label>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Supabase URL</label>
                 <input 
                   type="text" 
                   value={config.url}
@@ -141,7 +136,7 @@ const App: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Anon Key / API Key</label>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Anon API Key</label>
                 <input 
                   type="password" 
                   value={config.key}
@@ -151,11 +146,8 @@ const App: React.FC = () => {
                 />
               </div>
               <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transition-all">
-                Verbindung Speichern
+                Speichern & Neu laden
               </button>
-              <p className="text-[10px] text-gray-400 text-center italic">
-                Hinweis: Du benötigst eine Tabelle 'plz_entries' mit Realtime-Aktivierung.
-              </p>
             </form>
           </div>
         </div>
@@ -163,16 +155,14 @@ const App: React.FC = () => {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
           <div className="lg:col-span-5 flex flex-col gap-6">
             <section>
               <h2 className="text-3xl font-extrabold text-gray-900 mb-2 leading-tight">
                 Wer ist <span className="text-blue-600">woher?</span>
               </h2>
               <p className="text-gray-600 mb-6">
-                Teile deinen Standort live mit der Gruppe. Alle Daten werden sofort auf der Karte für jeden sichtbar.
+                Gib deine PLZ ein und sieh sofort, wo die anderen aus der Gruppe wohnen.
               </p>
-              
               <PLZInput onAdd={handleAddEntry} />
             </section>
 
@@ -180,79 +170,35 @@ const App: React.FC = () => {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Sparkles className="text-blue-600" size={20} />
-                  <h3 className="font-bold text-gray-800">KI-Regional-Analyse</h3>
+                  <h3 className="font-bold text-gray-800">KI-Analyse</h3>
                 </div>
                 <button 
-                  onClick={() => analyzeDistribution(entries).then(setAnalysis)}
-                  disabled={isAnalyzing || entries.length < 2}
-                  className="px-4 py-2 bg-white text-blue-600 text-sm font-bold rounded-lg shadow-sm border border-blue-100 hover:bg-blue-50 transition-all"
+                  onClick={() => {
+                    setIsAnalyzing(true);
+                    analyzeDistribution(entries).then(res => {
+                      setAnalysis(res);
+                      setIsAnalyzing(false);
+                    });
+                  }}
+                  disabled={isAnalyzing || entries.length < 1}
+                  className="px-4 py-2 bg-white text-blue-600 text-sm font-bold rounded-lg shadow-sm border border-blue-100 hover:bg-blue-50 transition-all disabled:opacity-50"
                 >
-                  Analyse starten
+                  {isAnalyzing ? "Analysiere..." : "Starten"}
                 </button>
               </div>
               <div className="min-h-[60px] text-sm text-gray-600 italic">
-                {analysis || "Analysiere die aktuelle Verteilung aller Teilnehmer..."}
-              </div>
-            </section>
-
-            <section className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hidden md:block">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <BarChart3 size={18} className="text-gray-500" />
-                Letzte Teilnehmer ({entries.length})
-              </h3>
-              <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                {entries.length === 0 ? (
-                  <p className="text-gray-400 text-sm text-center py-4">Warte auf Teilnehmer...</p>
-                ) : (
-                  entries.slice(0, 15).map((entry) => (
-                    <div key={entry.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-all animate-fade-in">
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                           <span className="font-bold text-gray-800">{entry.nickname}</span>
-                           <span className="text-[9px] font-bold bg-gray-200 px-1 rounded text-gray-600 uppercase">{entry.country}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-[10px] bg-blue-100 text-blue-700 px-1.5 rounded font-bold">{entry.code}</span>
-                          <span className="text-[10px] text-gray-500">{entry.city}</span>
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-gray-400">
-                        {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  ))
-                )}
+                {analysis || "Klicke auf Starten für eine KI-Zusammenfassung der Regionen."}
               </div>
             </section>
           </div>
 
-          <div className="lg:col-span-7 flex flex-col">
+          <div className="lg:col-span-7">
             <div className="sticky top-24">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                  Live DACH-Karte
-                  <span className="px-2 py-0.5 bg-blue-600 text-white text-[10px] rounded-full uppercase tracking-wider font-bold animate-pulse">Live</span>
-                </h3>
-              </div>
               <GermanyMap entries={entries} />
             </div>
           </div>
         </div>
       </main>
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes bounce-in {
-          0% { transform: translateY(-20px); opacity: 0; }
-          60% { transform: translateY(5px); opacity: 1; }
-          100% { transform: translateY(0); }
-        }
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateX(-10px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        .animate-bounce-in { animation: bounce-in 0.5s ease-out; }
-        .animate-fade-in { animation: fade-in 0.3s ease-out; }
-      `}} />
     </div>
   );
 };
