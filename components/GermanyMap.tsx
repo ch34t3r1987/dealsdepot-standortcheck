@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PLZEntry } from '../types';
-import { Flame, MapPin } from 'lucide-material';
+import { Flame, MapPin } from 'lucide-react';
 
-// Wir nutzen das globale 'L' von Leaflet, das via Script-Tag in index.html geladen wurde.
 declare const L: any;
 
 interface GermanyMapProps {
@@ -19,14 +18,14 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
   useEffect(() => {
     if (!mapContainerRef.current || mapInstance.current) return;
 
-    // Initialisierung der Karte
     mapInstance.current = L.map(mapContainerRef.current, {
       center: [51.1657, 10.4515],
       zoom: 6,
       zoomControl: true,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    // Dunklerer Kartenstil für das Dashboard-Gefühl
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       subdomains: 'abcd',
       maxZoom: 20
@@ -45,7 +44,6 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
   useEffect(() => {
     if (!mapInstance.current || !markersLayer.current) return;
     
-    // Alte Layer entfernen
     markersLayer.current.clearLayers();
     if (heatLayerInstance.current) {
       mapInstance.current.removeLayer(heatLayerInstance.current);
@@ -66,75 +64,79 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
       });
 
       Object.values(counts).forEach((data) => {
-        const size = 24 + Math.min(data.count * 4, 30);
+        const size = 32 + Math.min(data.count * 4, 30);
         const icon = L.divIcon({
           className: 'custom-marker',
-          html: `<div style="background:#2563eb;width:${size}px;height:${size}px;border-radius:50%;border:2px solid white;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;box-shadow:0 4px 12px rgba(37, 99, 235, 0.4)">${data.count > 1 ? data.count : ''}</div>`,
+          html: `<div style="background:#32c7a3;width:${size}px;height:${size}px;border-radius:12px;border:2px solid rgba(255,255,255,0.2);color:white;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;box-shadow:0 8px 24px rgba(50, 199, 163, 0.4)">${data.count > 1 ? data.count : '•'}</div>`,
           iconSize: [size, size],
           iconAnchor: [size / 2, size / 2],
         });
 
         L.marker([data.lat, data.lng], { icon })
           .bindPopup(`
-            <div class="p-1">
-              <div class="font-bold text-blue-600 border-b border-gray-100 mb-1 pb-1">${data.city}</div>
-              <div class="text-xs text-gray-600">${data.nicknames.join(', ')}</div>
+            <div class="bg-[#242424] text-white p-2 rounded-lg border border-white/10">
+              <div class="font-black text-[#32c7a3] border-b border-white/10 mb-2 pb-1 text-sm uppercase tracking-wider">${data.city}</div>
+              <div class="text-[11px] text-gray-300 font-medium leading-relaxed">${data.nicknames.join(', ')}</div>
             </div>
-          `)
+          `, { className: 'dark-popup' })
           .addTo(markersLayer.current!);
       });
     } else {
-      // Heatmap Modus
       if (typeof L.heatLayer === 'function' && entries.length > 0) {
-        // Wir erhöhen die Intensität pro Punkt, damit sie auch bei wenigen Usern sichtbar ist
         const heatData = entries.map(e => [e.lat, e.lng, 1.0]); 
         
         heatLayerInstance.current = L.heatLayer(heatData, {
-          radius: 35,      // Größerer Radius für bessere Sichtbarkeit
-          blur: 20,        // Weichere Kanten
+          radius: 35,
+          blur: 20,
           maxZoom: 10,
-          max: 1.0,        // Maximale Intensität bei einem Punkt erreichen
-          minOpacity: 0.4, // Damit man auch schwache Punkte sieht
+          max: 1.0,
+          minOpacity: 0.5,
           gradient: {
-            0.2: 'blue',
-            0.4: 'cyan',
-            0.6: 'lime',
-            0.8: 'yellow',
-            1.0: 'red'
+            0.2: '#1a1a1a',
+            0.4: '#1a4a3e',
+            0.6: '#269075',
+            0.8: '#32c7a3',
+            1.0: '#52ffda'
           }
         }).addTo(mapInstance.current);
 
-        // Sicherstellen, dass die Karte die Heatmap sofort zeichnet
         if (heatLayerInstance.current.redraw) {
           heatLayerInstance.current.redraw();
         }
       }
     }
 
-    // Auto-Zoom nur wenn Daten vorhanden
     if (entries.length > 0 && mapInstance.current) {
       const bounds = L.latLngBounds(entries.map(e => [e.lat, e.lng]));
-      mapInstance.current.fitBounds(bounds.pad(0.3)); // Etwas mehr Padding
+      mapInstance.current.fitBounds(bounds.pad(0.3));
     }
   }, [entries, viewMode]);
 
   return (
-    <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-2 h-[500px] lg:h-[650px] relative z-0">
-      <div className="absolute top-4 right-4 z-[1000] flex bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+    <div className="bg-white/5 rounded-[2.5rem] shadow-2xl border border-white/10 p-3 h-[600px] lg:h-[700px] relative z-0 backdrop-blur-md">
+      <div className="absolute top-6 right-6 z-[1000] flex bg-[#1a1a1a] p-1.5 rounded-2xl shadow-2xl border border-white/10">
         <button 
           onClick={() => setViewMode('markers')}
-          className={`px-3 py-2 flex items-center gap-2 text-xs font-bold transition-all ${viewMode === 'markers' ? 'bg-blue-600 text-white shadow-inner' : 'text-gray-500 hover:bg-gray-50'}`}
+          className={`px-5 py-2.5 flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all rounded-xl ${viewMode === 'markers' ? 'bg-[#32c7a3] text-white' : 'text-gray-500 hover:text-white'}`}
         >
-          <MapPin size={14} /> Marker
+          <MapPin size={14} /> Karte
         </button>
         <button 
           onClick={() => setViewMode('heatmap')}
-          className={`px-3 py-2 flex items-center gap-2 text-xs font-bold transition-all ${viewMode === 'heatmap' ? 'bg-orange-600 text-white shadow-inner' : 'text-gray-500 hover:bg-gray-50'}`}
+          className={`px-5 py-2.5 flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all rounded-xl ${viewMode === 'heatmap' ? 'bg-[#32c7a3] text-white' : 'text-gray-500 hover:text-white'}`}
         >
           <Flame size={14} /> Heatmap
         </button>
       </div>
-      <div ref={mapContainerRef} className="w-full h-full rounded-2xl overflow-hidden" />
+      <div ref={mapContainerRef} className="w-full h-full rounded-[2rem] overflow-hidden grayscale-[0.2] contrast-[1.1]" />
+      
+      <style>{`
+        .dark-popup .leaflet-popup-content-wrapper { background: #242424; color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; }
+        .dark-popup .leaflet-popup-tip { background: #242424; }
+        .leaflet-bar { border: none !important; box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important; }
+        .leaflet-bar a { background: #242424 !important; color: #32c7a3 !important; border-bottom: 1px solid rgba(255,255,255,0.05) !important; }
+        .leaflet-bar a:hover { background: #32c7a3 !important; color: white !important; }
+      `}</style>
     </div>
   );
 };
