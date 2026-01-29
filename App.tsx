@@ -1,20 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, Key, AlertCircle, ExternalLink } from 'lucide-react';
+import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry } from './types';
 import { analyzeDistribution } from './services/gemini';
 import * as sync from './services/syncService';
-
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
 
 export const App: React.FC = () => {
   const [entries, setEntries] = useState<PLZEntry[]>([]);
@@ -24,14 +14,11 @@ export const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [config, setConfig] = useState(sync.getStoredConfig());
   const [notification, setNotification] = useState<string | null>(null);
-  const [hasApiKey, setHasApiKey] = useState<boolean>(true);
-  const [apiError, setApiError] = useState<boolean>(false);
   
   const entriesRef = useRef<PLZEntry[]>([]);
   entriesRef.current = entries;
 
   useEffect(() => {
-    checkApiKey();
     if (config.url && config.key) {
       const client = sync.initSupabase(config.url, config.key);
       if (client) {
@@ -53,24 +40,6 @@ export const App: React.FC = () => {
       if (saved) setEntries(JSON.parse(saved));
     }
   }, [config]);
-
-  const checkApiKey = async () => {
-    if (window.aistudio) {
-      try {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(hasKey);
-      } catch (e) { console.warn("Key check failed", e); }
-    }
-  };
-
-  const handleOpenKeyPicker = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setHasApiKey(true);
-      setApiError(false);
-      setAnalysis('');
-    }
-  };
 
   const loadInitialData = async () => {
     const data = await sync.fetchEntries();
@@ -107,18 +76,11 @@ export const App: React.FC = () => {
   const handleStartAnalysis = async () => {
     if (entries.length < 2) return;
     setIsAnalyzing(true);
-    setApiError(false);
     try {
       const res = await analyzeDistribution(entries);
       setAnalysis(res);
-    } catch (err: any) {
-      if (err.message === 'KEY_INVALID') {
-        setHasApiKey(false);
-        setApiError(true);
-        setAnalysis("API-Key ungültig oder nicht gesetzt.");
-      } else {
-        setAnalysis("Analyse fehlgeschlagen. Bitte versuche es später erneut.");
-      }
+    } catch (err) {
+      setAnalysis("Analyse fehlgeschlagen.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -164,29 +126,14 @@ export const App: React.FC = () => {
               <X size={24} />
             </button>
             <h3 className="text-2xl font-bold mb-2 flex items-center gap-2 text-gray-900">
-              <Wifi className="text-blue-600" /> Einstellungen
+              <Wifi className="text-blue-600" /> Cloud Setup
             </h3>
-            <p className="text-gray-500 text-sm mb-6">Cloud-Sync und KI-Konfiguration.</p>
+            <p className="text-gray-500 text-sm mb-6">Supabase für Realtime-Sync einrichten.</p>
             <form onSubmit={(e) => { e.preventDefault(); sync.saveConfig(config.url, config.key); window.location.reload(); }} className="space-y-4">
-               <label className="block text-[10px] font-bold text-gray-400 uppercase">Supabase Cloud Sync</label>
               <input type="text" value={config.url} onChange={e => setConfig({...config, url: e.target.value})} placeholder="Supabase URL" className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500" />
               <input type="password" value={config.key} onChange={e => setConfig({...config, key: e.target.value})} placeholder="Anon Key" className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500" />
-              <button type="submit" className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all">Speichern</button>
+              <button type="submit" className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all">Verbinden</button>
             </form>
-            <div className="mt-8 pt-6 border-t border-gray-100">
-              <h4 className="text-sm font-bold text-gray-700 mb-2">KI-Schlüssel (Gemini)</h4>
-              <button onClick={handleOpenKeyPicker} className="w-full py-3 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-all mb-4">
-                <Key size={16} /> Kostenlosen Key wählen
-              </button>
-              <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl">
-                <p className="text-[11px] text-blue-800 leading-relaxed">
-                  Du kannst einen kostenlosen API-Key im Google AI Studio erstellen. Dieser reicht für private Analysen völlig aus.
-                </p>
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-[11px] text-blue-600 font-bold mt-2 flex items-center gap-1 hover:underline">
-                  <ExternalLink size={12} /> Kostenlosen Key erstellen
-                </a>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -225,24 +172,12 @@ export const App: React.FC = () => {
             <section className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2"><Sparkles className="text-blue-600" size={18} /><h3 className="font-bold text-gray-800 text-sm">KI-Analyse</h3></div>
-                {!hasApiKey || apiError ? (
-                  <button onClick={handleOpenKeyPicker} className="px-3 py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 transition-all shadow-md">
-                    <Key size={12} /> Key wählen
-                  </button>
-                ) : (
-                  <button onClick={handleStartAnalysis} disabled={isAnalyzing || entries.length < 2} className="px-3 py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 disabled:opacity-30 transition-all">
-                    {isAnalyzing ? "Analysiere..." : "Starten"}
-                  </button>
-                )}
+                <button onClick={handleStartAnalysis} disabled={isAnalyzing || entries.length < 2} className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-30 transition-all shadow-lg shadow-blue-100">
+                  {isAnalyzing ? "Analysiere..." : "Starten"}
+                </button>
               </div>
-              {apiError && (
-                <div className="mb-3 p-3 bg-amber-50 border border-amber-100 rounded-xl flex gap-2 items-start text-amber-800 text-[11px]">
-                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                  <div><p className="font-bold">Key erforderlich</p><p>Bitte wähle einen API-Key aus deinem Profil aus.</p></div>
-                </div>
-              )}
-              <div className="text-xs text-gray-600 italic leading-relaxed min-h-[40px]">
-                {analysis || (entries.length < 2 ? "Mindestens 2 Einträge nötig." : "Klicke auf 'Starten'.")}
+              <div className="text-xs text-gray-600 italic leading-relaxed min-h-[40px] bg-gray-50 p-4 rounded-xl border border-gray-100">
+                {analysis || (entries.length < 2 ? "Füge mindestens 2 Personen hinzu." : "Bereit für die Analyse.")}
               </div>
             </section>
           </div>
@@ -251,7 +186,7 @@ export const App: React.FC = () => {
             <div className="sticky top-24">
               <GermanyMap entries={entries} />
               <div className="mt-4 flex gap-4 text-[10px] text-gray-400 font-bold uppercase justify-center">
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-600"></div> DE / AT / CH</span>
+                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-600"></div> DE / AT / CH Karte aktiv</span>
               </div>
             </div>
           </div>
