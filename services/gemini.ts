@@ -8,11 +8,12 @@ export async function analyzeDistribution(entries: PLZEntry[]): Promise<string> 
   if (entries.length === 0) return "Keine Daten vorhanden.";
 
   try {
-    // Greift auf die in Vercel definierte Variable APIGEM_KEY zu
-    const apiKey = process.env.APIGEM_KEY;
+    // Wir prüfen beide möglichen Variablennamen
+    const apiKey = process.env.APIGEM_KEY || process.env.API_KEY;
     
-    if (!apiKey || apiKey === "undefined") {
-      throw new Error("APIGEM_KEY_MISSING");
+    if (!apiKey || apiKey === "undefined" || apiKey === "") {
+      console.error("API Key ist leer oder undefined");
+      throw new Error("API_KEY_MISSING");
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -26,7 +27,7 @@ export async function analyzeDistribution(entries: PLZEntry[]): Promise<string> 
     
     return response.text || "Analyse abgeschlossen.";
   } catch (error: any) {
-    console.error("Gemini API Fehler:", error);
+    console.error("Gemini API Fehler Details:", error);
     throw error;
   }
 }
