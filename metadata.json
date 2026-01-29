@@ -1,5 +1,7 @@
-
 {
   "name": "PLZ-Voter: Deutschland-Verteilung",
-  "description": "Ein interaktives Abstimmungstool zur Visualisierung der geografischen Verteilung einer Gruppe basierend auf deutschen Postleitzahlen."
+  "description": "Ein interaktives Abstimmungstool zur Visualisierung der geografischen Verteilung einer Gruppe basierend auf deutschen Postleitzahlen.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }
