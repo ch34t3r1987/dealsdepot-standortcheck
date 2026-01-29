@@ -1,4 +1,3 @@
-
 export type CountryCode = 'DE' | 'AT' | 'CH';
 
 export interface PLZEntry {
@@ -10,6 +9,7 @@ export interface PLZEntry {
   lat: number;
   lng: number;
   city?: string;
+  state?: string; // Bundesland oder Kanton
 }
 
 export interface PLZRegion {
@@ -17,4 +17,5 @@ export interface PLZRegion {
   name: string;
   lat: number;
   lng: number;
+  state: string; // Zugehöriges Bundesland
 }
