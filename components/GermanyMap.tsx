@@ -8,7 +8,6 @@ interface GermanyMapProps {
 }
 
 // Erweitern des L Namespaces für das Heatmap Plugin, da es global geladen wird
-// Fix: Corrected syntax error by using 'namespace' instead of 'border' and wrapping in 'declare global'.
 declare global {
   namespace L {
     function heatLayer(data: any[], options: any): any;
@@ -19,8 +18,17 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const markersLayer = useRef<L.LayerGroup | null>(null);
-  const heatLayer = useRef<any>(null);
+  const heatLayerInstance = useRef<any>(null);
   const [viewMode, setViewMode] = useState<'markers' | 'heatmap'>('markers');
+
+  // "Brücke" schlagen: Das Heatmap-Plugin hängt sich oft an das globale window.L
+  // Wenn wir Leaflet als Modul importieren, müssen wir sicherstellen, dass L.heatLayer verfügbar ist.
+  useEffect(() => {
+    const globalL = (window as any).L;
+    if (globalL && globalL.heatLayer && !L.heatLayer) {
+      (L as any).heatLayer = globalL.heatLayer;
+    }
+  }, []);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapInstance.current) return;
@@ -52,9 +60,9 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
     
     // Alte Layer entfernen
     markersLayer.current.clearLayers();
-    if (heatLayer.current) {
-      mapInstance.current.removeLayer(heatLayer.current);
-      heatLayer.current = null;
+    if (heatLayerInstance.current) {
+      mapInstance.current.removeLayer(heatLayerInstance.current);
+      heatLayerInstance.current = null;
     }
 
     if (viewMode === 'markers') {
@@ -89,19 +97,21 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
           .addTo(markersLayer.current!);
       });
     } else {
-      // Heatmap Modus
-      const heatData = entries.map(e => [e.lat, e.lng, 0.5]); // [lat, lng, intensity]
-      // @ts-ignore - Leaflet.heat ist global geladen
-      heatLayer.current = (L as any).heatLayer(heatData, {
-        radius: 25,
-        blur: 15,
-        maxZoom: 10,
-        gradient: { 0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red' }
-      }).addTo(mapInstance.current);
+      // Heatmap Modus mit Fehler-Check
+      if (typeof L.heatLayer === 'function') {
+        const heatData = entries.map(e => [e.lat, e.lng, 1.0]); // [lat, lng, intensity]
+        heatLayerInstance.current = L.heatLayer(heatData, {
+          radius: 20,
+          blur: 15,
+          maxZoom: 10,
+          gradient: { 0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red' }
+        }).addTo(mapInstance.current);
+      } else {
+        console.error("Leaflet Heatmap Plugin ist nicht geladen.");
+      }
     }
 
     if (entries.length > 0 && mapInstance.current) {
-      // Nur zoomen, wenn Einträge da sind
       const bounds = L.latLngBounds(entries.map(e => [e.lat, e.lng]));
       mapInstance.current.fitBounds(bounds.pad(0.2));
     }
