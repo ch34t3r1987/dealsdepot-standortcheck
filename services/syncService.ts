@@ -1,6 +1,10 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PLZEntry } from '../types';
 
+// HIER DEINE DATEN EINTRAGEN, DAMIT ES FÜR ALLE NUTZER SOFORT FUNKTIONIERT
+const DEFAULT_SUPABASE_URL = ''; // Beispiel: 'https://xyz.supabase.co'
+const DEFAULT_SUPABASE_KEY = ''; // Dein Anon-Key
+
 let supabase: SupabaseClient | null = null;
 
 export const initSupabase = (url: string, key: string) => {
@@ -15,9 +19,14 @@ export const initSupabase = (url: string, key: string) => {
 };
 
 export const getStoredConfig = () => {
+  // 1. Suche in localStorage (manuelle User-Eingabe)
+  const localUrl = localStorage.getItem('supabase_url');
+  const localKey = localStorage.getItem('supabase_key');
+
+  // 2. Wenn nichts in localStorage, nutze die Standardwerte oben
   return {
-    url: localStorage.getItem('supabase_url') || '',
-    key: localStorage.getItem('supabase_key') || ''
+    url: localUrl || DEFAULT_SUPABASE_URL,
+    key: localKey || DEFAULT_SUPABASE_KEY
   };
 };
 
