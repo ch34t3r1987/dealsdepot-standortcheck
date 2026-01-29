@@ -17,7 +17,7 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
     if (!nickname.trim()) { setError('Anzeigename fehlt'); return; }
     if (plz.length < 4) { setError('PLZ ist zu kurz'); return; }
 
-    const { lat, lng, region } = getCoordsForPLZ(plz, country);
+    const { lat, lng, region, state } = getCoordsForPLZ(plz, country);
     onAdd({
       id: Math.random().toString(36).substring(7),
       code: plz,
@@ -26,7 +26,8 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
       timestamp: Date.now(),
       lat,
       lng,
-      city: region
+      city: region,
+      state: state
     });
     setPlz('');
     setNickname('');
