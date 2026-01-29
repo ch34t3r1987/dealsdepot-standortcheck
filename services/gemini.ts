@@ -8,24 +8,23 @@ export async function analyzeDistribution(entries: PLZEntry[]): Promise<string> 
   if (entries.length === 0) return "Keine Daten vorhanden.";
 
   try {
-    // Die API-Key-Bereitstellung erfolgt automatisch durch die Plattform.
+    // Fixed: Always create a new instance right before use to ensure it picks up the latest API key from context.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const plzList = entries.map(e => `${e.code} (${e.city}, ${e.country})`).join(", ");
     
+    // Fixed: Using the simple string content for generateContent as per documentation examples for basic text tasks.
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: {
-        parts: [{
-          text: `Analysiere kurz diese Postleitzahlen-Liste einer Gruppe aus der DACH-Region: [${plzList}]. 
-          Wo liegen die geografischen Schwerpunkte? Antworte in 1-2 prägnanten Sätzen auf Deutsch.`
-        }]
-      }
+      contents: `Analysiere kurz diese Postleitzahlen-Liste einer Gruppe aus der DACH-Region: [${plzList}]. 
+          Wo liegen die geografischen Schwerpunkte? Antworte in 1-2 prägnanten Sätzen auf Deutsch.`,
     });
     
+    // Fixed: Access the .text property directly (not a function) to get the string output.
     return response.text || "Analyse abgeschlossen.";
   } catch (error: any) {
     console.error("Gemini API Fehler:", error);
-    return "Die KI-Analyse ist momentan nicht verfügbar. Bitte versuche es später noch einmal.";
+    // Wir werfen den Fehler weiter, damit die UI darauf reagieren kann
+    throw error;
   }
 }
