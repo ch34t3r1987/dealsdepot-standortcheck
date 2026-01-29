@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PLZEntry } from '../types';
-import { Flame, MapPin } from 'lucide-react';
+import { Flame, MapPin } from 'lucide-material';
 
 // Wir nutzen das globale 'L' von Leaflet, das via Script-Tag in index.html geladen wurde.
 declare const L: any;
@@ -85,25 +85,36 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
       });
     } else {
       // Heatmap Modus
-      if (typeof L.heatLayer === 'function') {
-        // Wir setzen die Intensität auf 1.0 pro Punkt
+      if (typeof L.heatLayer === 'function' && entries.length > 0) {
+        // Wir erhöhen die Intensität pro Punkt, damit sie auch bei wenigen Usern sichtbar ist
         const heatData = entries.map(e => [e.lat, e.lng, 1.0]); 
         
         heatLayerInstance.current = L.heatLayer(heatData, {
-          radius: 20,
-          blur: 15,
+          radius: 35,      // Größerer Radius für bessere Sichtbarkeit
+          blur: 20,        // Weichere Kanten
           maxZoom: 10,
-          gradient: { 0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red' }
+          max: 1.0,        // Maximale Intensität bei einem Punkt erreichen
+          minOpacity: 0.4, // Damit man auch schwache Punkte sieht
+          gradient: {
+            0.2: 'blue',
+            0.4: 'cyan',
+            0.6: 'lime',
+            0.8: 'yellow',
+            1.0: 'red'
+          }
         }).addTo(mapInstance.current);
-      } else {
-        console.error("Heatmap Plugin nicht gefunden.");
+
+        // Sicherstellen, dass die Karte die Heatmap sofort zeichnet
+        if (heatLayerInstance.current.redraw) {
+          heatLayerInstance.current.redraw();
+        }
       }
     }
 
     // Auto-Zoom nur wenn Daten vorhanden
     if (entries.length > 0 && mapInstance.current) {
       const bounds = L.latLngBounds(entries.map(e => [e.lat, e.lng]));
-      mapInstance.current.fitBounds(bounds.pad(0.2));
+      mapInstance.current.fitBounds(bounds.pad(0.3)); // Etwas mehr Padding
     }
   }, [entries, viewMode]);
 
@@ -112,13 +123,13 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
       <div className="absolute top-4 right-4 z-[1000] flex bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
         <button 
           onClick={() => setViewMode('markers')}
-          className={`px-3 py-2 flex items-center gap-2 text-xs font-bold transition-all ${viewMode === 'markers' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+          className={`px-3 py-2 flex items-center gap-2 text-xs font-bold transition-all ${viewMode === 'markers' ? 'bg-blue-600 text-white shadow-inner' : 'text-gray-500 hover:bg-gray-50'}`}
         >
           <MapPin size={14} /> Marker
         </button>
         <button 
           onClick={() => setViewMode('heatmap')}
-          className={`px-3 py-2 flex items-center gap-2 text-xs font-bold transition-all ${viewMode === 'heatmap' ? 'bg-orange-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+          className={`px-3 py-2 flex items-center gap-2 text-xs font-bold transition-all ${viewMode === 'heatmap' ? 'bg-orange-600 text-white shadow-inner' : 'text-gray-500 hover:bg-gray-50'}`}
         >
           <Flame size={14} /> Heatmap
         </button>
