@@ -9,23 +9,30 @@ import * as sync from './services/syncService';
 
 const DDLogo = () => {
   const [imgError, setImgError] = useState(false);
+  
+  // Wenn das Bild wegen CORS oder anderen Problemen nicht lädt, zeigen wir ein schönes SVG/Text Logo
+  if (imgError) {
+    return (
+      <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-[#32c7a3] p-2 shadow-lg border border-white/20">
+        <div className="flex flex-col items-center justify-center leading-none text-white font-black">
+          <span className="text-[10px] tracking-tighter">DEAL</span>
+          <span className="text-[10px] tracking-tighter">DEPOT</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-center w-12 h-12 overflow-hidden rounded-xl bg-gradient-to-br from-[#32c7a3] to-[#25a083] p-0.5 border border-white/20 shadow-lg group relative">
-      <div className="w-full h-full bg-[#1a1a1a] rounded-[10px] flex items-center justify-center font-black text-white text-sm tracking-tighter select-none relative overflow-hidden">
-        {!imgError ? (
-          <img 
-            src="https://dealdepot.io/wp-content/uploads/2023/03/ddd-300x300.png" 
-            alt="DD" 
-            className="w-full h-full object-contain filter brightness-125"
-            onError={() => setImgError(true)}
-            /* crossOrigin entfernt, da der Server es nicht unterstützt */
-          />
-        ) : (
-          <div className="flex flex-col items-center leading-none">
-            <span className="text-[#32c7a3] text-[10px] font-black">DEAL</span>
-            <span className="text-white text-[10px] font-black">DEPOT</span>
-          </div>
-        )}
+      <div className="w-full h-full bg-[#1a1a1a] rounded-[10px] flex items-center justify-center relative overflow-hidden">
+        <img 
+          src="https://dealdepot.io/wp-content/uploads/2023/03/ddd-300x300.png" 
+          alt="DD" 
+          className="w-full h-full object-contain filter brightness-125 transition-transform group-hover:scale-110"
+          onError={() => setImgError(true)}
+          // KEIN crossOrigin mehr, um CORS-Header-Anforderungen zu umgehen
+          loading="lazy"
+        />
       </div>
     </div>
   );
@@ -151,6 +158,7 @@ export const App: React.FC = () => {
             <button 
               onClick={() => setShowSettings(true)} 
               className="p-2.5 bg-white/5 rounded-xl text-gray-400 hover:text-[#32c7a3] hover:bg-[#32c7a3]/10 transition-all border border-white/5"
+              aria-label="Einstellungen"
             >
               <Settings size={20} />
             </button>
@@ -234,7 +242,11 @@ export const App: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <button onClick={() => handleDeleteEntry(entry.id)} className="p-3 text-gray-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110">
+                      <button 
+                        onClick={() => handleDeleteEntry(entry.id)} 
+                        className="p-3 text-gray-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"
+                        title="Löschen"
+                      >
                         <Trash2 size={20} />
                       </button>
                     </div>
