@@ -1,21 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, Key, AlertCircle, ExternalLink, Info, Globe } from 'lucide-react';
+import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, AlertCircle, Globe } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry } from './types';
 import { analyzeDistribution } from './services/gemini';
 import * as sync from './services/syncService';
-
-// AI Studio Integration Types
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
 
 export const App: React.FC = () => {
   const [entries, setEntries] = useState<PLZEntry[]>([]);
@@ -72,13 +61,15 @@ export const App: React.FC = () => {
       const res = await analyzeDistribution(entries);
       setAnalysis(res);
     } catch (err: any) {
-      console.error("Fehler in der Analyse:", err);
+      console.error("Analyse-Error:", err);
       if (err.message === "API_KEY_MISSING") {
-        setKeyError("Kein API-Key gefunden. Bitte ein neues Deployment in Vercel starten.");
-      } else if (err.message?.includes("API key not valid") || err.status === 400) {
-        setKeyError("Der API-Key ist ungültig. Prüfe die Billing-Einstellungen im Google AI Studio.");
+        setKeyError("Der API-Key wurde im System nicht gefunden.");
+      } else if (err.message === "API_KEY_INVALID_FORMAT") {
+        setKeyError("Das Format des Keys ist falsch (muss mit 'AIza' beginnen). Bitte in Vercel korrigieren.");
+      } else if (err.status === 400 || err.message?.includes("key not valid")) {
+        setKeyError("Google meldet: 'API key not valid'. Bitte Key im AI Studio neu generieren und ohne Leerzeichen kopieren.");
       } else {
-        setAnalysis("Analyse fehlgeschlagen. Bitte versuche es später erneut.");
+        setAnalysis("KI-Dienst momentan nicht erreichbar.");
       }
     } finally {
       setIsAnalyzing(false);
@@ -88,7 +79,7 @@ export const App: React.FC = () => {
   const handleAddEntry = async (entry: PLZEntry) => {
     if (isLive) {
       const success = await sync.pushEntry(entry);
-      if (!success) alert("Fehler beim Cloud-Speichern.");
+      if (!success) alert("Cloud-Fehler.");
     } else {
       const newEntries = [entry, ...entries];
       setEntries(newEntries);
@@ -97,7 +88,7 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteEntry = async (id: string) => {
-    if (window.confirm("Diesen Eintrag löschen?")) {
+    if (window.confirm("Löschen?")) {
       if (isLive) await sync.deleteEntry(id);
       else {
         const newEntries = entries.filter(e => e.id !== id);
@@ -147,13 +138,13 @@ export const App: React.FC = () => {
               <X size={24} />
             </button>
             <h3 className="text-2xl font-bold mb-2 flex items-center gap-2 text-gray-900">
-              <Wifi className="text-blue-600" /> Cloud Setup
+              <Wifi className="text-blue-600" /> Cloud Sync
             </h3>
-            <p className="text-gray-500 text-sm mb-6">Supabase für Realtime-Sync einrichten.</p>
+            <p className="text-gray-500 text-sm mb-6">Realtime-Anbindung verwalten.</p>
             <form onSubmit={(e) => { e.preventDefault(); sync.saveConfig(config.url, config.key); window.location.reload(); }} className="space-y-4">
               <input type="text" value={config.url} onChange={e => setConfig({...config, url: e.target.value})} placeholder="Supabase URL" className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500" />
               <input type="password" value={config.key} onChange={e => setConfig({...config, key: e.target.value})} placeholder="Anon Key" className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500" />
-              <button type="submit" className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all">Verbinden</button>
+              <button type="submit" className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all">Speichern & Reload</button>
             </form>
           </div>
         </div>
@@ -169,7 +160,7 @@ export const App: React.FC = () => {
             
             <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between font-bold text-gray-700 text-sm">
-                <div className="flex items-center gap-2"><Clock size={16} className="text-blue-600" /> Letzte Einträge</div>
+                <div className="flex items-center gap-2"><Clock size={16} className="text-blue-600" /> Einträge</div>
                 <span className="text-[10px] bg-white border border-gray-200 px-2 py-0.5 rounded-full text-gray-500 uppercase">{entries.length}</span>
               </div>
               <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
@@ -196,45 +187,33 @@ export const App: React.FC = () => {
                   <Sparkles className={keyError ? 'text-red-500' : 'text-blue-600'} size={18} />
                   <h3 className="font-bold text-gray-800 text-sm">KI-Analyse</h3>
                 </div>
-                {!keyError && (
-                  <button 
-                    onClick={handleStartAnalysis} 
-                    disabled={isAnalyzing || entries.length < 2} 
-                    className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-30 transition-all shadow-lg shadow-blue-100 flex items-center gap-2"
-                  >
-                    {isAnalyzing ? "Analysiere..." : <><Sparkles size={14} /> Starten</>}
-                  </button>
-                )}
+                <button 
+                  onClick={handleStartAnalysis} 
+                  disabled={isAnalyzing || entries.length < 2} 
+                  className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-30 transition-all shadow-lg shadow-blue-100 flex items-center gap-2"
+                >
+                  {isAnalyzing ? "Analysiere..." : "Starten"}
+                </button>
               </div>
 
               {keyError && (
-                <div className="mb-4 space-y-4">
+                <div className="mb-4 space-y-3">
                   <div className="flex items-start gap-3 p-3 bg-red-100/50 rounded-xl border border-red-100">
                     <AlertCircle className="text-red-600 shrink-0 mt-0.5" size={16} />
                     <div className="text-xs">
-                      <p className="font-bold text-red-900">Konfigurations-Fehler</p>
+                      <p className="font-bold text-red-900">API-Fehler</p>
                       <p className="text-red-700 leading-tight mt-1">{keyError}</p>
                     </div>
                   </div>
-                  
-                  <div className="bg-white/80 p-4 rounded-xl border border-gray-100 text-[11px] text-gray-600 space-y-2 shadow-sm">
-                    <div className="flex items-center gap-2 text-blue-600 font-bold uppercase tracking-wider">
-                      <Globe size={12} /> Deployment erforderlich
-                    </div>
-                    <p>
-                      Umgebungsvariablen werden bei Vercel erst nach einem <strong>neuen Deployment</strong> aktiv.
-                    </p>
-                    <ol className="list-decimal pl-4 space-y-1">
-                      <li>Gehe in Vercel auf den Tab <strong>Deployments</strong>.</li>
-                      <li>Wähle dein oberstes Deployment und klicke auf die drei Punkte <code className="bg-gray-100 px-1 rounded">...</code></li>
-                      <li>Wähle <strong>Redeploy</strong> aus.</li>
-                    </ol>
+                  <div className="bg-white/80 p-3 rounded-xl border border-gray-100 text-[10px] text-gray-500 flex items-center gap-2">
+                    <Globe size={12} className="text-blue-400" />
+                    Tipp: Überprüfe den Key im AI Studio auf Leerzeichen.
                   </div>
                 </div>
               )}
 
               <div className={`text-xs italic leading-relaxed min-h-[40px] p-4 rounded-xl border ${keyError ? 'bg-white/50 border-red-100 text-red-400' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
-                {analysis || (entries.length < 2 ? "Füge mindestens 2 Personen hinzu." : "Bereit für die Analyse.")}
+                {analysis || (entries.length < 2 ? "Füge mindestens 2 Personen hinzu." : "Bereit.")}
               </div>
             </section>
           </div>
@@ -242,9 +221,6 @@ export const App: React.FC = () => {
           <div className="lg:col-span-7">
             <div className="sticky top-24">
               <GermanyMap entries={entries} />
-              <div className="mt-4 flex gap-4 text-[10px] text-gray-400 font-bold uppercase justify-center">
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-600"></div> DE / AT / CH Karte aktiv</span>
-              </div>
             </div>
           </div>
         </div>
