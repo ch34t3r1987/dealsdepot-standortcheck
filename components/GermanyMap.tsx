@@ -24,7 +24,6 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
       zoomControl: true,
     });
 
-    // Hellen Kartenstil mit GARANTIERT deutscher Beschriftung verwenden (OSM DE Tiles)
     L.tileLayer('https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> Mitwirkende',
       maxZoom: 19
@@ -50,11 +49,12 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
     }
 
     if (viewMode === 'markers') {
-      const counts: Record<string, { count: number; lat: number; lng: number; city?: string; nicknames: string[] }> = {};
+      const counts: Record<string, { count: number; lat: number; lng: number; city?: string; plz: string; nicknames: string[] }> = {};
       entries.forEach((e) => {
-        const key = `${e.lat.toFixed(2)}|${e.lng.toFixed(2)}`;
+        // Wir gruppieren nach exakten Koordinaten (da Jitter jetzt klein ist)
+        const key = `${e.lat.toFixed(4)}|${e.lng.toFixed(4)}`;
         if (!counts[key]) {
-          counts[key] = { count: 0, lat: e.lat, lng: e.lng, city: e.city, nicknames: [] };
+          counts[key] = { count: 0, lat: e.lat, lng: e.lng, city: e.city, plz: e.code, nicknames: [] };
         }
         counts[key].count++;
         if (!counts[key].nicknames.includes(e.nickname)) {
@@ -74,40 +74,41 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
         L.marker([data.lat, data.lng], { icon })
           .bindPopup(`
             <div class="bg-white text-gray-900 p-2 rounded-lg shadow-xl">
-              <div class="font-black text-[#32c7a3] border-b border-gray-100 mb-2 pb-1 text-sm uppercase tracking-wider">${data.city}</div>
-              <div class="text-[11px] text-gray-600 font-medium leading-relaxed">${data.nicknames.join(', ')}</div>
+              <div class="font-black text-[#32c7a3] border-b border-gray-100 mb-2 pb-1 text-sm uppercase tracking-wider flex justify-between items-center gap-4">
+                <span>${data.city}</span>
+                <span class="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">${data.plz}</span>
+              </div>
+              <div class="text-[11px] text-gray-600 font-medium leading-relaxed max-w-[200px]">${data.nicknames.join(', ')}</div>
             </div>
           `, { className: 'light-popup' })
           .addTo(markersLayer.current!);
       });
     } else {
       if (typeof L.heatLayer === 'function' && entries.length > 0) {
-        // Wir übergeben Intensität (3. Wert) basierend auf Anzahl der Punkte an dieser Stelle
-        // Wenn 5 Personen an einem Ort sind, wird dieser Punkt "heißer".
         const pointMap: Record<string, [number, number, number]> = {};
         entries.forEach(e => {
           const key = `${e.lat.toFixed(3)},${e.lng.toFixed(3)}`;
           if (!pointMap[key]) {
             pointMap[key] = [e.lat, e.lng, 0];
           }
-          pointMap[key][2] += 0.4; // Jede Person erhöht die Hitze um 0.4
+          pointMap[key][2] += 0.4;
         });
 
         const heatData = Object.values(pointMap); 
         
         heatLayerInstance.current = L.heatLayer(heatData, {
-          radius: 40, // Größerer Radius für besseres Blending
+          radius: 40,
           blur: 25,
           maxZoom: 9,
-          max: 1.0, // Bei 1.0 ist die maximale Farbe erreicht (ca. 3 Personen)
+          max: 1.0,
           minOpacity: 0.4,
           gradient: {
-            0.1: '#e5f9f5', // Sehr helles Türkis
-            0.3: '#b2eddf', // Helles Türkis
-            0.5: '#65dcc1', // Mittleres Türkis
-            0.7: '#32c7a3', // DealDepot Teal
-            0.8: '#f59e0b', // Amber/Orange bei Clustern
-            1.0: '#ef4444'  // Tiefrot bei starken Hotspots
+            0.1: '#e5f9f5',
+            0.3: '#b2eddf',
+            0.5: '#65dcc1',
+            0.7: '#32c7a3',
+            0.8: '#f59e0b',
+            1.0: '#ef4444'
           }
         }).addTo(mapInstance.current);
 
