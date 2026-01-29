@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Trash2, Wifi, Settings, X, CheckCircle2, Clock, Search, Filter, MapPin } from 'lucide-react';
+import { Trash2, Wifi, Settings, X, CheckCircle2, Clock, Search, Filter, MapPin, Eraser } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry, CountryCode } from './types';
@@ -30,6 +30,11 @@ export const App: React.FC = () => {
   
   const entriesRef = useRef<PLZEntry[]>([]);
   entriesRef.current = entries;
+
+  // Reset state filter when country changes
+  useEffect(() => {
+    setStateFilter('ALL');
+  }, [countryFilter]);
 
   useEffect(() => {
     if (config.url && config.key) {
@@ -86,16 +91,31 @@ export const App: React.FC = () => {
     }
   };
 
+  const resetFilters = () => {
+    setSearchTerm('');
+    setCountryFilter('ALL');
+    setStateFilter('ALL');
+  };
+
   // Filter Logic
   const filteredEntries = useMemo(() => {
     return entries.filter(entry => {
-      const matchesSearch = entry.nickname.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      // Search matching (nickname or city)
+      const matchesSearch = searchTerm === '' || 
+                            entry.nickname.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (entry.city && entry.city.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      // Country matching
       const matchesCountry = countryFilter === 'ALL' || entry.country === countryFilter;
-      const matchesState = stateFilter === 'ALL' || entry.state === stateFilter;
+      
+      // State matching (handle legacy data without 'state' property)
+      const matchesState = stateFilter === 'ALL' || (entry.state && entry.state === stateFilter);
+      
       return matchesSearch && matchesCountry && matchesState;
     });
   }, [entries, searchTerm, countryFilter, stateFilter]);
+
+  const isFilterActive = searchTerm !== '' || countryFilter !== 'ALL' || stateFilter !== 'ALL';
 
   return (
     <div className="min-h-screen bg-[#1a1a1a] pb-12 font-sans text-gray-200">
@@ -177,7 +197,17 @@ export const App: React.FC = () => {
                   <Clock size={18} className="text-[#32c7a3]" /> 
                   <span className="text-sm">Teilnehmerliste</span>
                 </div>
-                <span className="text-xs bg-[#32c7a3] px-2.5 py-1 rounded-full text-white">{filteredEntries.length} {filteredEntries.length === 1 ? 'Person' : 'Personen'}</span>
+                <div className="flex items-center gap-2">
+                  {isFilterActive && (
+                    <button 
+                      onClick={resetFilters}
+                      className="text-[10px] text-gray-500 hover:text-red-400 transition-colors flex items-center gap-1 uppercase tracking-widest font-bold"
+                    >
+                      <Eraser size={12} /> Filter zurücksetzen
+                    </button>
+                  )}
+                  <span className="text-xs bg-[#32c7a3] px-2.5 py-1 rounded-full text-white">{filteredEntries.length} {filteredEntries.length === 1 ? 'Person' : 'Personen'}</span>
+                </div>
               </div>
 
               {/* Filter Area */}
@@ -223,12 +253,12 @@ export const App: React.FC = () => {
                   </div>
 
                   {countryFilter === 'DE' && (
-                    <div className="flex items-center gap-2">
-                      <MapPin size={14} className="text-gray-500 shrink-0" />
+                    <div className="flex items-center gap-2 animate-bounce-in">
+                      <MapPin size={14} className="text-[#32c7a3] shrink-0" />
                       <select 
                         value={stateFilter}
                         onChange={(e) => setStateFilter(e.target.value)}
-                        className="w-full bg-[#1a1a1a] border border-white/10 text-xs rounded-lg px-2 py-1.5 text-gray-300 outline-none focus:border-[#32c7a3] transition-colors"
+                        className="w-full bg-[#1a1a1a] border border-white/10 text-xs rounded-lg px-2 py-2 text-gray-300 outline-none focus:border-[#32c7a3] transition-colors cursor-pointer"
                       >
                         <option value="ALL">Alle Bundesländer</option>
                         {DE_STATES.map(s => <option key={s} value={s}>{s}</option>)}
