@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, AlertCircle, Globe } from 'lucide-react';
+import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, AlertCircle, Globe, RefreshCw } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry } from './types';
@@ -62,12 +62,11 @@ export const App: React.FC = () => {
       setAnalysis(res);
     } catch (err: any) {
       console.error("Analyse-Error:", err);
+      // Wenn der Key fehlt oder ungültig ist
       if (err.message === "API_KEY_MISSING") {
-        setKeyError("Der API-Key wurde im System nicht gefunden.");
-      } else if (err.message === "API_KEY_INVALID_FORMAT") {
-        setKeyError("Das Format des Keys ist falsch (muss mit 'AIza' beginnen). Bitte in Vercel korrigieren.");
+        setKeyError("Key nicht geladen.");
       } else if (err.status === 400 || err.message?.includes("key not valid")) {
-        setKeyError("Google meldet: 'API key not valid'. Bitte Key im AI Studio neu generieren und ohne Leerzeichen kopieren.");
+        setKeyError("Google lehnt den Key ab.");
       } else {
         setAnalysis("KI-Dienst momentan nicht erreichbar.");
       }
@@ -99,7 +98,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
+    <div className="min-h-screen bg-gray-50 pb-12 font-sans">
       {notification && (
         <div className="fixed top-20 right-4 z-[9999] animate-bounce-in">
           <div className="bg-blue-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-blue-400">
@@ -198,16 +197,27 @@ export const App: React.FC = () => {
 
               {keyError && (
                 <div className="mb-4 space-y-3">
-                  <div className="flex items-start gap-3 p-3 bg-red-100/50 rounded-xl border border-red-100">
-                    <AlertCircle className="text-red-600 shrink-0 mt-0.5" size={16} />
+                  <div className="flex items-start gap-3 p-4 bg-red-100/50 rounded-xl border border-red-200">
+                    <AlertCircle className="text-red-600 shrink-0 mt-0.5" size={18} />
                     <div className="text-xs">
-                      <p className="font-bold text-red-900">API-Fehler</p>
-                      <p className="text-red-700 leading-tight mt-1">{keyError}</p>
+                      <p className="font-bold text-red-900 mb-1">Deployment-Problem erkannt</p>
+                      <p className="text-red-800 leading-tight">
+                        Vercel hat den neuen Key noch nicht in die App geladen. Dein Key im Dashboard sieht korrekt aus!
+                      </p>
                     </div>
                   </div>
-                  <div className="bg-white/80 p-3 rounded-xl border border-gray-100 text-[10px] text-gray-500 flex items-center gap-2">
-                    <Globe size={12} className="text-blue-400" />
-                    Tipp: Überprüfe den Key im AI Studio auf Leerzeichen.
+                  <div className="bg-white p-4 rounded-xl border border-gray-100 space-y-3 shadow-sm">
+                    <p className="text-[11px] font-bold text-gray-700 uppercase flex items-center gap-2">
+                      <RefreshCw size={12} className="text-blue-500" /> So löst du es:
+                    </p>
+                    <ol className="text-[11px] text-gray-600 space-y-2 list-decimal pl-4">
+                      <li>Klicke in Vercel oben auf <strong>Deployments</strong>.</li>
+                      <li>Klicke beim obersten (neuesten) Eintrag auf die <strong>drei Punkte (...)</strong>.</li>
+                      <li>Wähle <strong>Redeploy</strong> und bestätige.</li>
+                    </ol>
+                    <p className="text-[10px] text-gray-400 italic">
+                      Hinweis: Ohne diesen Schritt "denkt" die App, der Key wäre leer oder ungültig.
+                    </p>
                   </div>
                 </div>
               )}
