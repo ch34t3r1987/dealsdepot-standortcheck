@@ -6,7 +6,7 @@ import { PLZEntry } from './types';
 import { analyzeDistribution } from './services/gemini';
 import * as sync from './services/syncService';
 
-const App: React.FC = () => {
+export const App: React.FC = () => {
   const [entries, setEntries] = useState<PLZEntry[]>([]);
   const [analysis, setAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -238,5 +238,3 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-export default App;
