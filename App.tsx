@@ -7,11 +7,15 @@ import { DE_STATES, getCoordsForPLZ } from './utils/plzData';
 import * as sync from './services/syncService';
 
 const DDLogo = () => (
-  <div className="flex items-center justify-center w-10 h-10 overflow-hidden rounded-lg">
+  <div className="flex items-center justify-center w-12 h-12 overflow-hidden rounded-xl bg-white/5 p-1 border border-white/10">
     <img 
       src="https://dealdepot.io/wp-content/uploads/2023/03/ddd-300x300.png" 
       alt="DealDepot Logo" 
-      className="w-full h-full object-contain"
+      className="w-full h-full object-contain filter brightness-110"
+      onError={(e) => {
+        // Fallback falls das Bild nicht lädt
+        (e.target as HTMLImageElement).src = "https://ui-avatars.com/api/?name=DD&background=32c7a3&color=fff";
+      }}
     />
   </div>
 );
@@ -137,7 +141,7 @@ export const App: React.FC = () => {
 
       <header className="bg-[#1a1a1a]/80 border-b border-white/5 sticky top-0 z-50 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <DDLogo />
             <h1 className="text-xl font-bold tracking-tight text-white">
               DealDepot <span className="text-[#32c7a3]">Standortcheck</span>
