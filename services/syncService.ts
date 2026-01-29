@@ -1,19 +1,21 @@
+
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PLZEntry } from '../types';
 
-// HIER DEINE DATEN EINTRAGEN, DAMIT ES FÜR ALLE NUTZER SOFORT FUNKTIONIERT
-const DEFAULT_SUPABASE_URL = 'https://brgrgtlajusvmtxexffz.supabase.co'; // Beispiel: 'https://xyz.supabase.co'
-const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJyZ3JndGxhanVzdm10eGV4ZmZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2OTEwNDgsImV4cCI6MjA4NTI2NzA0OH0.nt6nsfHn9dAfuk54fH9vJTEeTrsHJMPrVQS6MxS4IMo'; // Dein Anon-Key
+const DEFAULT_SUPABASE_URL = ''; 
+const DEFAULT_SUPABASE_KEY = ''; 
 
 let supabase: SupabaseClient | null = null;
 
 export const initSupabase = (url: string, key: string) => {
   if (!url || !key) return null;
   try {
+    // Falls die URL ungültig ist, wirft createClient evtl. einen Fehler
+    if (!url.startsWith('http')) return null;
     supabase = createClient(url, key);
     return supabase;
   } catch (err) {
-    console.error("Supabase Init Error:", err);
+    console.warn("Supabase Init Error:", err);
     return null;
   }
 };
@@ -41,34 +43,38 @@ export const fetchEntries = async (): Promise<PLZEntry[]> => {
       .select('*')
       .order('timestamp', { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.warn("Fetch Error (Database missing?):", error.message);
+      return [];
+    }
     return data || [];
   } catch (error) {
-    console.error("Error fetching:", error);
     return [];
   }
 };
 
-export const pushEntry = async (entry: PLZEntry) => {
+export const pushEntry = async (entry: PLZEntry): Promise<boolean> => {
   if (!supabase) return false;
   try {
     const { error } = await supabase.from('plz_entries').insert([entry]);
-    if (error) throw error;
+    if (error) {
+      console.error("Push Error details:", error);
+      return false;
+    }
     return true;
   } catch (error) {
-    console.error("Error pushing:", error);
+    console.error("Critical Cloud Error:", error);
     return false;
   }
 };
 
-export const deleteEntry = async (id: string) => {
+export const deleteEntry = async (id: string): Promise<boolean> => {
   if (!supabase) return false;
   try {
     const { error } = await supabase.from('plz_entries').delete().eq('id', id);
-    if (error) throw error;
+    if (error) return false;
     return true;
   } catch (error) {
-    console.error("Error deleting:", error);
     return false;
   }
 };
@@ -79,13 +85,17 @@ export const subscribeToChanges = (
 ) => {
   if (!supabase) return null;
   
-  return supabase
-    .channel('public:plz_entries')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'plz_entries' }, (payload) => {
-      onNewEntry(payload.new as PLZEntry);
-    })
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'plz_entries' }, (payload) => {
-      onDeletedEntry(payload.old.id);
-    })
-    .subscribe();
+  try {
+    return supabase
+      .channel('public:plz_entries')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'plz_entries' }, (payload) => {
+        if (payload.new) onNewEntry(payload.new as PLZEntry);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'plz_entries' }, (payload) => {
+        if (payload.old) onDeletedEntry(payload.old.id);
+      })
+      .subscribe();
+  } catch (e) {
+    return null;
+  }
 };
