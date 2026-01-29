@@ -1,28 +1,30 @@
-
 import { GoogleGenAI } from "@google/genai";
-import { PLZEntry } from "../types.ts";
+import { PLZEntry } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
+/**
+ * Analysiert die geografische Verteilung der Einträge mittels Gemini.
+ */
 export async function analyzeDistribution(entries: PLZEntry[]): Promise<string> {
-  if (entries.length === 0) return "Noch keine Daten vorhanden.";
-  
-  const plzList = entries.map(e => e.code).join(", ");
-  
+  if (entries.length === 0) return "Keine Daten vorhanden.";
+
   try {
+    // Initialisierung erfolgt strikt mit dem process.env.API_KEY
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const plzList = entries.map(e => `${e.code} (${e.city}, ${e.country})`).join(", ");
+    
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Hier ist eine Liste von deutschen Postleitzahlen einer Gruppe: [${plzList}]. 
-      Analysiere die geografische Verteilung. Woher kommen die meisten? 
-      Gibt es interessante regionale Cluster? Antworte kurz und prägnant auf Deutsch.`,
-      config: {
-        thinkingConfig: { thinkingBudget: 0 }
-      }
+      contents: `Analysiere die folgende Liste von Postleitzahlen einer Gruppe aus der DACH-Region: [${plzList}]. 
+      Wo liegen die geografischen Schwerpunkte? Gibt es Cluster in bestimmten Ballungsräumen? 
+      Antworte kurz und prägnant in maximal 3 Sätzen auf Deutsch.`,
     });
     
-    return response.text || "Die Analyse konnte nicht erstellt werden.";
+    // Direkter Zugriff auf die .text Property des Response-Objekts
+    return response.text || "Die Analyse konnte keine Ergebnisse liefern.";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Fehler bei der KI-Analyse.";
+    console.error("Gemini API Error:", error);
+    // Rückgabe einer hilfreichen Nachricht bei Fehlern (z.B. ungültiger Key oder Quota)
+    return "KI-Analyse aktuell nicht verfügbar. Bitte sicherstellen, dass ein gültiger API-Schlüssel konfiguriert ist.";
   }
 }
