@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, Key, AlertCircle, ExternalLink, Info } from 'lucide-react';
+import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, Key, AlertCircle, ExternalLink, Info, Globe } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry } from './types';
@@ -63,24 +63,6 @@ export const App: React.FC = () => {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const handleSelectKey = async () => {
-    console.log("Klick auf: Jetzt Projekt verknüpfen");
-    if (window.aistudio) {
-      try {
-        console.log("Rufe window.aistudio.openSelectKey() auf...");
-        await window.aistudio.openSelectKey();
-        setKeyError(null);
-        showToast("Projekt-Auswahl gestartet.");
-      } catch (err) {
-        console.error("Fehler beim Öffnen des Key-Dialogs:", err);
-        setKeyError("Der Dialog konnte nicht geöffnet werden. Bitte Browser-Popups prüfen.");
-      }
-    } else {
-      console.warn("window.aistudio ist nicht verfügbar");
-      setKeyError("Die Google AI Studio Schnittstelle ist in diesem Browser-Tab nicht aktiv. Bitte lade die Seite neu.");
-    }
-  };
-
   const handleStartAnalysis = async () => {
     if (entries.length < 2) return;
     
@@ -91,13 +73,10 @@ export const App: React.FC = () => {
       setAnalysis(res);
     } catch (err: any) {
       console.error("Fehler in der Analyse:", err);
-      // "Requested entity was not found" oder 400 deutet meist auf fehlende Abrechnung oder falschen Key hin
-      if (err.message?.includes("Requested entity was not found") || err.status === 400 || err.message?.includes("API key not valid")) {
-        setKeyError("Der aktuelle Key ist ungültig oder hat keine Abrechnung hinterlegt.");
-        if (window.aistudio) {
-          console.log("Automatischer Trigger des Key-Pickers aufgrund von API-Fehler");
-          await window.aistudio.openSelectKey();
-        }
+      if (err.message === "APIGEM_KEY_MISSING") {
+        setKeyError("Kein API-Key gefunden. Bitte in Vercel als APIGEM_KEY hinterlegen.");
+      } else if (err.message?.includes("API key not valid") || err.status === 400) {
+        setKeyError("Der angegebene APIGEM_KEY ist ungültig oder die Abrechnung im Google Projekt fehlt.");
       } else {
         setAnalysis("Analyse fehlgeschlagen. Bitte versuche es später erneut.");
       }
@@ -229,36 +208,26 @@ export const App: React.FC = () => {
               </div>
 
               {keyError && (
-                <div className="mb-4">
-                  <div className="flex items-start gap-3 p-3 bg-red-100/50 rounded-xl border border-red-100 mb-3">
+                <div className="mb-4 space-y-4">
+                  <div className="flex items-start gap-3 p-3 bg-red-100/50 rounded-xl border border-red-100">
                     <AlertCircle className="text-red-600 shrink-0 mt-0.5" size={16} />
-                    <div>
-                      <p className="text-xs font-bold text-red-900">API-Key erforderlich</p>
-                      <p className="text-[11px] text-red-700 leading-tight mt-1">{keyError}</p>
+                    <div className="text-xs">
+                      <p className="font-bold text-red-900">Konfigurations-Fehler</p>
+                      <p className="text-red-700 leading-tight mt-1">{keyError}</p>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-3">
-                    <div className="bg-white/80 p-3 rounded-xl border border-red-50 text-[10px] text-gray-600 flex items-start gap-2 shadow-sm">
-                      <Info size={12} className="text-blue-500 shrink-0 mt-0.5" />
-                      <div>
-                        Wähle im folgenden Dialog ein <strong>Google Cloud Projekt mit aktivierter Abrechnung</strong> aus. 
-                        Der Key wird dann automatisch im Hintergrund hinterlegt.
-                      </div>
+                  
+                  <div className="bg-white/80 p-4 rounded-xl border border-gray-100 text-[11px] text-gray-600 space-y-2 shadow-sm">
+                    <div className="flex items-center gap-2 text-blue-600 font-bold uppercase tracking-wider">
+                      <Globe size={12} /> Vercel Setup benötigt
                     </div>
-                    <button 
-                      onClick={handleSelectKey}
-                      className="w-full flex items-center justify-center gap-2 py-4 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 transition-all shadow-xl shadow-red-200 animate-pulse-slow"
-                    >
-                      <Key size={18} /> Jetzt Projekt auswählen
-                    </button>
-                    <a 
-                      href="https://ai.google.dev/gemini-api/docs/billing" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-gray-500 flex items-center justify-center gap-1 hover:text-blue-600 transition-colors underline underline-offset-2"
-                    >
-                      Dokumentation zur Abrechnung öffnen <ExternalLink size={10} />
-                    </a>
+                    <p>
+                      Bitte hinterlege deinen Key in deinem Vercel Dashboard unter <strong>Settings > Environment Variables</strong>.
+                    </p>
+                    <div className="pl-2 border-l-2 border-blue-200 italic">
+                      Variable Name: <code className="bg-gray-100 px-1 rounded text-blue-700">APIGEM_KEY</code>
+                    </div>
+                    <p className="text-[10px]">Vergiss nicht, danach ein neues Deployment zu starten, damit die Variable aktiv wird.</p>
                   </div>
                 </div>
               )}
