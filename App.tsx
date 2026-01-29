@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Trash2, Wifi, Settings, X, CheckCircle2, Clock, Search, Filter, MapPin, Eraser, Map as MapIcon } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry, CountryCode } from './types';
-import { DE_STATES, getCoordsForPLZ } from './utils/plzData';
+import { DE_STATES } from './utils/plzData';
 import * as sync from './services/syncService';
 
 const DDLogo = () => {
@@ -83,14 +84,15 @@ export const App: React.FC = () => {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const handleAddEntry = async (entry: PLZEntry) => {
+  const handleAddEntry = async (entry: PLZEntry): Promise<boolean> => {
     if (isLive) {
       const success = await sync.pushEntry(entry);
-      if (!success) alert("Cloud-Fehler.");
+      return success;
     } else {
       const newEntries = [entry, ...entries];
       setEntries(newEntries);
       localStorage.setItem('plz-votes', JSON.stringify(newEntries));
+      return true;
     }
   };
 
@@ -117,13 +119,7 @@ export const App: React.FC = () => {
                             entry.nickname.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (entry.city && entry.city.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCountry = countryFilter === 'ALL' || entry.country === countryFilter;
-      
-      let effectiveState = entry.state;
-      if (!effectiveState && entry.code) {
-        const coords = getCoordsForPLZ(entry.code, entry.country);
-        effectiveState = coords.state;
-      }
-      const matchesState = stateFilter === 'ALL' || effectiveState === stateFilter;
+      const matchesState = stateFilter === 'ALL' || entry.state === stateFilter;
       return matchesSearch && matchesCountry && matchesState;
     });
   }, [entries, searchTerm, countryFilter, stateFilter]);
@@ -197,7 +193,7 @@ export const App: React.FC = () => {
                   <span className="text-[#32c7a3]">eure Gruppe?</span>
                 </h2>
                 <p className="text-gray-400 text-lg max-w-md font-medium">
-                  Deine Community-Verteilung mit maximaler PLZ-Präzision.
+                  Präzise Standort-Analyse für eure Community.
                 </p>
               </div>
               <PLZInput onAdd={handleAddEntry} />
@@ -265,32 +261,26 @@ export const App: React.FC = () => {
                 {filteredEntries.length === 0 ? (
                   <div className="p-16 text-center text-gray-600 text-xs font-bold uppercase tracking-widest italic opacity-50">Keine Daten</div>
                 ) : (
-                  filteredEntries.map((entry) => {
-                    let displayState = entry.state;
-                    if (!displayState && entry.code) {
-                      displayState = getCoordsForPLZ(entry.code, entry.country).state;
-                    }
-                    return (
-                      <div key={entry.id} className="px-8 py-6 flex items-center justify-between group hover:bg-white/[0.04] transition-all cursor-default">
-                        <div className="flex gap-5 items-center">
-                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#32c7a3]/20 to-[#32c7a3]/5 text-[#32c7a3] flex items-center justify-center font-black text-[11px] border border-[#32c7a3]/30 uppercase shadow-inner">{entry.country}</div>
-                          <div>
-                            <div className="flex items-center gap-3">
-                              <span className="font-bold text-white text-base">{entry.nickname}</span>
-                              <span className="text-[10px] font-black bg-white/10 text-gray-400 px-2 py-0.5 rounded-md uppercase tracking-widest">{entry.code}</span>
-                            </div>
-                            <div className="text-[12px] text-gray-500 mt-1 font-semibold flex items-center gap-1.5">
-                              <MapPin size={12} className="opacity-50" />
-                              {entry.city} <span className="opacity-30">|</span> {displayState}
-                            </div>
+                  filteredEntries.map((entry) => (
+                    <div key={entry.id} className="px-8 py-6 flex items-center justify-between group hover:bg-white/[0.04] transition-all cursor-default">
+                      <div className="flex gap-5 items-center">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#32c7a3]/20 to-[#32c7a3]/5 text-[#32c7a3] flex items-center justify-center font-black text-[11px] border border-[#32c7a3]/30 uppercase shadow-inner">{entry.country}</div>
+                        <div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold text-white text-base">{entry.nickname}</span>
+                            <span className="text-[10px] font-black bg-white/10 text-gray-400 px-2 py-0.5 rounded-md uppercase tracking-widest">{entry.code}</span>
+                          </div>
+                          <div className="text-[12px] text-gray-500 mt-1 font-semibold flex items-center gap-1.5">
+                            <MapPin size={12} className="opacity-50" />
+                            {entry.city} <span className="opacity-30">|</span> {entry.state || 'Unbekannt'}
                           </div>
                         </div>
-                        <button onClick={() => handleDeleteEntry(entry.id)} className="p-3 text-gray-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110">
-                          <Trash2 size={20} />
-                        </button>
                       </div>
-                    );
-                  })
+                      <button onClick={() => handleDeleteEntry(entry.id)} className="p-3 text-gray-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110">
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  ))
                 )}
               </div>
             </section>
