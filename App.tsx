@@ -222,7 +222,7 @@ export const App: React.FC = () => {
                       <Globe size={12} /> Vercel Setup benötigt
                     </div>
                     <p>
-                      Bitte hinterlege deinen Key in deinem Vercel Dashboard unter <strong>Settings > Environment Variables</strong>.
+                      Bitte hinterlege deinen Key in deinem Vercel Dashboard unter <strong>Settings &gt; Environment Variables</strong>.
                     </p>
                     <div className="pl-2 border-l-2 border-blue-200 italic">
                       Variable Name: <code className="bg-gray-100 px-1 rounded text-blue-700">APIGEM_KEY</code>
