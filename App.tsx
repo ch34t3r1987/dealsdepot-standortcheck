@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Map as MapIcon, Trash2, Wifi, Settings, X, CheckCircle2, Clock, Sparkles, Loader2, Info } from 'lucide-react';
+import { Map as MapIcon, Trash2, Wifi, Settings, X, CheckCircle2, Clock } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry } from './types';
 import * as sync from './services/syncService';
-import { analyzeDistribution } from './services/gemini';
 
 export const App: React.FC = () => {
   const [entries, setEntries] = useState<PLZEntry[]>([]);
@@ -12,11 +11,6 @@ export const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [config, setConfig] = useState(sync.getStoredConfig());
   const [notification, setNotification] = useState<string | null>(null);
-  
-  // KI-Analyse States
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
   
   const entriesRef = useRef<PLZEntry[]>([]);
   entriesRef.current = entries;
@@ -52,29 +46,6 @@ export const App: React.FC = () => {
   const showToast = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 4000);
-  };
-
-  const handleStartAnalysis = async () => {
-    if (entries.length < 2) {
-      showToast("Nicht genügend Daten für eine Analyse (min. 2).");
-      return;
-    }
-
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-    setAnalysisResult(null);
-
-    try {
-      const result = await analyzeDistribution(entries);
-      setAnalysisResult(result);
-      showToast("KI-Analyse erfolgreich abgeschlossen!");
-    } catch (err: any) {
-      console.error("Fehler bei der KI-Analyse:", err);
-      setAnalysisError("Die Analyse konnte nicht gestartet werden. Prüfen Sie den API_KEY.");
-      showToast("Fehler bei der KI-Analyse.");
-    } finally {
-      setIsAnalyzing(false);
-    }
   };
 
   const handleAddEntry = async (entry: PLZEntry) => {
@@ -162,45 +133,10 @@ export const App: React.FC = () => {
             <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex-1">
               <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between font-bold text-gray-700 text-sm">
                 <div className="flex items-center gap-2"><Clock size={16} className="text-blue-600" /> Einträge</div>
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={handleStartAnalysis}
-                    disabled={isAnalyzing || entries.length < 2}
-                    className="flex items-center gap-2 text-[10px] bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold uppercase tracking-wider shadow-sm"
-                  >
-                    {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                    KI-Analyse
-                  </button>
-                  <span className="text-[10px] bg-white border border-gray-200 px-2 py-0.5 rounded-full text-gray-500 uppercase">{entries.length}</span>
-                </div>
+                <span className="text-[10px] bg-white border border-gray-200 px-2 py-0.5 rounded-full text-gray-500 uppercase">{entries.length}</span>
               </div>
 
-              {/* Analyse-Ergebnis Bereich */}
-              {(analysisResult || analysisError) && (
-                <div className={`m-4 p-4 rounded-xl border animate-in fade-in slide-in-from-top-2 duration-300 ${analysisError ? 'bg-red-50 border-red-100' : 'bg-blue-50 border-blue-100'}`}>
-                  <div className="flex items-start gap-3">
-                    <div className={`p-1.5 rounded-lg ${analysisError ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                      {analysisError ? <Info size={16} /> : <Sparkles size={16} />}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className={`text-xs font-bold uppercase tracking-wider mb-1 ${analysisError ? 'text-red-700' : 'text-blue-700'}`}>
-                        {analysisError ? 'Fehler' : 'KI-Erkenntnis'}
-                      </h4>
-                      <p className={`text-sm leading-relaxed ${analysisError ? 'text-red-600' : 'text-blue-900 font-medium'}`}>
-                        {analysisError || analysisResult}
-                      </p>
-                    </div>
-                    <button 
-                      onClick={() => { setAnalysisResult(null); setAnalysisError(null); }}
-                      className="text-gray-400 hover:text-gray-600 p-1"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="max-h-[450px] overflow-y-auto custom-scrollbar">
+              <div className="max-h-[550px] overflow-y-auto custom-scrollbar">
                 {entries.length === 0 ? <div className="p-10 text-center text-gray-400 text-sm italic">Noch keine Daten...</div> : 
                   entries.map((entry) => (
                     <div key={entry.id} className="px-5 py-4 border-b border-gray-50 flex items-center justify-between group hover:bg-blue-50/30 transition-all">
