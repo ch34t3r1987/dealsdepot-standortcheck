@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Trash2, Wifi, Settings, X, CheckCircle2, Clock, Search, Filter, MapPin, Eraser, Map as MapIcon } from 'lucide-react';
+import { Trash2, Wifi, Settings, X, CheckCircle2, Clock, Search, MapPin, Eraser, AlertTriangle } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry, CountryCode } from './types';
@@ -9,7 +9,6 @@ import * as sync from './services/syncService';
 
 const DDLogo = () => {
   const [imgError, setImgError] = useState(false);
-
   return (
     <div className="flex items-center justify-center w-12 h-12 overflow-hidden rounded-xl bg-gradient-to-br from-[#32c7a3] to-[#25a083] p-0.5 border border-white/20 shadow-lg group relative">
       <div className="w-full h-full bg-[#1a1a1a] rounded-[10px] flex items-center justify-center font-black text-white text-sm tracking-tighter select-none relative overflow-hidden">
@@ -37,9 +36,8 @@ export const App: React.FC = () => {
   const [isLive, setIsLive] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [config, setConfig] = useState(sync.getStoredConfig());
-  const [notification, setNotification] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
   
-  // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [countryFilter, setCountryFilter] = useState<CountryCode | 'ALL'>('ALL');
   const [stateFilter, setStateFilter] = useState<string>('ALL');
@@ -52,42 +50,50 @@ export const App: React.FC = () => {
   }, [countryFilter]);
 
   useEffect(() => {
-    if (config.url && config.key) {
-      const client = sync.initSupabase(config.url, config.key);
-      if (client) {
-        setIsLive(true);
-        loadInitialData();
-        const subscription = sync.subscribeToChanges(
-          (newEntry) => {
-            if (!entriesRef.current.some(e => e.id === newEntry.id)) {
-              setEntries(prev => [newEntry, ...prev]);
-              showToast(`${newEntry.nickname} aus ${newEntry.city} ist dabei!`);
-            }
-          },
-          (deletedId) => setEntries(prev => prev.filter(e => e.id !== deletedId))
-        );
-        return () => { subscription?.unsubscribe(); };
+    const tryConnect = async () => {
+      if (config.url && config.key) {
+        const client = sync.initSupabase(config.url, config.key);
+        if (client) {
+          setIsLive(true);
+          const data = await sync.fetchEntries();
+          setEntries(data);
+          
+          const subscription = sync.subscribeToChanges(
+            (newEntry) => {
+              if (!entriesRef.current.some(e => e.id === newEntry.id)) {
+                setEntries(prev => [newEntry, ...prev]);
+                showToast(`${newEntry.nickname} ist jetzt dabei!`, 'success');
+              }
+            },
+            (deletedId) => setEntries(prev => prev.filter(e => e.id !== deletedId))
+          );
+          return () => { subscription?.unsubscribe(); };
+        }
+      } else {
+        setIsLive(false);
+        const saved = localStorage.getItem('plz-votes');
+        if (saved) setEntries(JSON.parse(saved));
       }
-    } else {
-      const saved = localStorage.getItem('plz-votes');
-      if (saved) setEntries(JSON.parse(saved));
-    }
+    };
+    tryConnect();
   }, [config]);
 
-  const loadInitialData = async () => {
-    const data = await sync.fetchEntries();
-    setEntries(data);
-  };
-
-  const showToast = (msg: string) => {
-    setNotification(msg);
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ msg, type });
     setTimeout(() => setNotification(null), 4000);
   };
 
   const handleAddEntry = async (entry: PLZEntry): Promise<boolean> => {
     if (isLive) {
       const success = await sync.pushEntry(entry);
-      return success;
+      if (!success) {
+        showToast("Cloud-Sync fehlgeschlagen. Speichere lokal...", "error");
+        // Fallback zu lokal
+        const newEntries = [entry, ...entries];
+        setEntries(newEntries);
+        return true; 
+      }
+      return true;
     } else {
       const newEntries = [entry, ...entries];
       setEntries(newEntries);
@@ -97,20 +103,14 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteEntry = async (id: string) => {
-    if (window.confirm("Löschen?")) {
-      if (isLive) await sync.deleteEntry(id);
-      else {
-        const newEntries = entries.filter(e => e.id !== id);
-        setEntries(newEntries);
-        localStorage.setItem('plz-votes', JSON.stringify(newEntries));
-      }
+    if (isLive) {
+      const success = await sync.deleteEntry(id);
+      if (!success) showToast("Konnte in der Cloud nicht gelöscht werden.", "error");
+    } else {
+      const newEntries = entries.filter(e => e.id !== id);
+      setEntries(newEntries);
+      localStorage.setItem('plz-votes', JSON.stringify(newEntries));
     }
-  };
-
-  const resetFilters = () => {
-    setSearchTerm('');
-    setCountryFilter('ALL');
-    setStateFilter('ALL');
   };
 
   const filteredEntries = useMemo(() => {
@@ -124,15 +124,13 @@ export const App: React.FC = () => {
     });
   }, [entries, searchTerm, countryFilter, stateFilter]);
 
-  const isFilterActive = searchTerm !== '' || countryFilter !== 'ALL' || stateFilter !== 'ALL';
-
   return (
     <div className="min-h-screen bg-[#0f0f0f] pb-12 font-sans text-gray-200">
       {notification && (
         <div className="fixed top-24 right-4 z-[9999] animate-bounce-in">
-          <div className="bg-[#32c7a3] text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/20">
-            <CheckCircle2 size={20} />
-            <span className="font-medium text-sm">{notification}</span>
+          <div className={`${notification.type === 'success' ? 'bg-[#32c7a3]' : 'bg-red-500'} text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/20`}>
+            {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertTriangle size={20} />}
+            <span className="font-medium text-sm">{notification.msg}</span>
           </div>
         </div>
       )}
@@ -149,16 +147,13 @@ export const App: React.FC = () => {
           <div className="flex items-center gap-4">
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider ${isLive ? 'bg-[#32c7a3]/10 text-[#32c7a3]' : 'bg-white/5 text-gray-500'}`}>
               <div className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-[#32c7a3] live-pulse' : 'bg-gray-600'}`}></div>
-              {isLive ? 'SYNC AKTIV' : 'LOKAL'}
+              {isLive ? 'SYNC AKTIV' : 'LOKAL-MODUS'}
             </div>
             <button 
               onClick={() => setShowSettings(true)} 
               className="p-2.5 bg-white/5 rounded-xl text-gray-400 hover:text-[#32c7a3] hover:bg-[#32c7a3]/10 transition-all border border-white/5"
             >
               <Settings size={20} />
-            </button>
-            <button className="px-6 py-2.5 bg-[#32c7a3] text-white font-bold rounded-xl text-sm shadow-lg shadow-[#32c7a3]/20 hover:brightness-110 transition-all active:scale-95">
-              Dashboard
             </button>
           </div>
         </div>
@@ -173,11 +168,11 @@ export const App: React.FC = () => {
             <h3 className="text-2xl font-bold mb-2 flex items-center gap-2 text-white">
               <Wifi className="text-[#32c7a3]" /> Cloud Sync
             </h3>
-            <p className="text-gray-400 text-sm mb-6">Realtime-Datenbank Anbindung.</p>
+            <p className="text-gray-400 text-sm mb-6">Realtime-Datenbank für Gruppen-Sync.</p>
             <form onSubmit={(e) => { e.preventDefault(); sync.saveConfig(config.url, config.key); window.location.reload(); }} className="space-y-4">
-              <input type="text" value={config.url} onChange={e => setConfig({...config, url: e.target.value})} placeholder="Supabase URL" className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 text-white outline-none focus:ring-2 focus:ring-[#32c7a3]" />
+              <input type="text" value={config.url} onChange={e => setConfig({...config, url: e.target.value})} placeholder="Supabase URL (https://...)" className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 text-white outline-none focus:ring-2 focus:ring-[#32c7a3]" />
               <input type="password" value={config.key} onChange={e => setConfig({...config, key: e.target.value})} placeholder="Anon Key" className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 text-white outline-none focus:ring-2 focus:ring-[#32c7a3]" />
-              <button type="submit" className="w-full py-4 bg-[#32c7a3] text-white font-bold rounded-xl hover:brightness-110 transition-all">Speichern</button>
+              <button type="submit" className="w-full py-4 bg-[#32c7a3] text-white font-bold rounded-xl hover:brightness-110 transition-all">Speichern & Reload</button>
             </form>
           </div>
         </div>
@@ -193,7 +188,7 @@ export const App: React.FC = () => {
                   <span className="text-[#32c7a3]">eure Gruppe?</span>
                 </h2>
                 <p className="text-gray-400 text-lg max-w-md font-medium">
-                  Präzise Standort-Analyse für eure Community.
+                  Deine Community-Verteilung mit maximaler PLZ-Präzision.
                 </p>
               </div>
               <PLZInput onAdd={handleAddEntry} />
@@ -205,17 +200,7 @@ export const App: React.FC = () => {
                   <Clock size={18} className="text-[#32c7a3]" /> 
                   <span className="text-xs uppercase tracking-[0.2em] font-black opacity-80">Teilnehmer</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {isFilterActive && (
-                    <button 
-                      onClick={resetFilters}
-                      className="text-[10px] text-gray-500 hover:text-[#32c7a3] transition-colors flex items-center gap-1 uppercase tracking-widest font-black"
-                    >
-                      <Eraser size={12} /> Filter aus
-                    </button>
-                  )}
-                  <span className="text-[10px] font-black bg-[#32c7a3] px-3 py-1 rounded-full text-white uppercase tracking-wider">{filteredEntries.length} Aktiv</span>
-                </div>
+                <span className="text-[10px] font-black bg-[#32c7a3] px-3 py-1 rounded-full text-white uppercase tracking-wider">{filteredEntries.length} Aktiv</span>
               </div>
 
               <div className="p-6 bg-white/[0.01] border-b border-white/5 space-y-4">
@@ -229,37 +214,11 @@ export const App: React.FC = () => {
                     className="w-full pl-11 pr-4 py-3 bg-white/5 rounded-xl border border-white/10 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-[#32c7a3] transition-all"
                   />
                 </div>
-                
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                  {['ALL', 'DE', 'AT', 'CH'].map(c => (
-                    <button 
-                      key={c}
-                      onClick={() => setCountryFilter(c as any)}
-                      className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border shrink-0 ${countryFilter === c ? 'bg-[#32c7a3] text-white border-[#32c7a3] shadow-lg shadow-[#32c7a3]/20' : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'}`}
-                    >
-                      {c === 'ALL' ? 'Alle' : c}
-                    </button>
-                  ))}
-                </div>
-
-                {countryFilter === 'DE' && (
-                  <div className="flex items-center gap-2 animate-bounce-in">
-                    <MapPin size={14} className="text-[#32c7a3] shrink-0" />
-                    <select 
-                      value={stateFilter}
-                      onChange={(e) => setStateFilter(e.target.value)}
-                      className="w-full bg-[#1a1a1a] border border-white/10 text-xs font-bold rounded-lg px-3 py-2 text-gray-400 outline-none focus:border-[#32c7a3] transition-colors cursor-pointer"
-                    >
-                      <option value="ALL">Alle Bundesländer</option>
-                      {DE_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                )}
               </div>
 
               <div className="max-h-[450px] overflow-y-auto custom-scrollbar divide-y divide-white/5">
                 {filteredEntries.length === 0 ? (
-                  <div className="p-16 text-center text-gray-600 text-xs font-bold uppercase tracking-widest italic opacity-50">Keine Daten</div>
+                  <div className="p-16 text-center text-gray-600 text-xs font-bold uppercase tracking-widest italic opacity-50">Keine Daten gefunden</div>
                 ) : (
                   filteredEntries.map((entry) => (
                     <div key={entry.id} className="px-8 py-6 flex items-center justify-between group hover:bg-white/[0.04] transition-all cursor-default">
