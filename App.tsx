@@ -1,10 +1,19 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock } from 'lucide-react';
+import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, Key } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry } from './types';
 import { analyzeDistribution } from './services/gemini';
 import * as sync from './services/syncService';
+
+// Extend window interface for the custom aistudio methods
+// Use the built-in AIStudio type to avoid conflict with existing global declarations
+declare global {
+  interface Window {
+    aistudio: AIStudio;
+  }
+}
 
 export const App: React.FC = () => {
   const [entries, setEntries] = useState<PLZEntry[]>([]);
@@ -14,11 +23,13 @@ export const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [config, setConfig] = useState(sync.getStoredConfig());
   const [notification, setNotification] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true);
   
   const entriesRef = useRef<PLZEntry[]>([]);
   entriesRef.current = entries;
 
   useEffect(() => {
+    checkApiKey();
     if (config.url && config.key) {
       const client = sync.initSupabase(config.url, config.key);
       if (client) {
@@ -46,6 +57,21 @@ export const App: React.FC = () => {
       if (saved) setEntries(JSON.parse(saved));
     }
   }, [config]);
+
+  const checkApiKey = async () => {
+    if (window.aistudio) {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      setHasApiKey(hasKey);
+    }
+  };
+
+  const handleOpenKeyPicker = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      // Per guidelines: MUST assume the key selection was successful after triggering openSelectKey()
+      setHasApiKey(true);
+    }
+  };
 
   const loadInitialData = async () => {
     const data = await sync.fetchEntries();
@@ -77,6 +103,24 @@ export const App: React.FC = () => {
         setEntries(newEntries);
         localStorage.setItem('plz-votes', JSON.stringify(newEntries));
       }
+    }
+  };
+
+  const handleStartAnalysis = async () => {
+    setIsAnalyzing(true);
+    try {
+      const res = await analyzeDistribution(entries);
+      setAnalysis(res);
+    } catch (err: any) {
+      // Handle the KEY_INVALID signal from the gemini service
+      if (err.message === 'KEY_INVALID') {
+        setHasApiKey(false);
+        setAnalysis("API-Key ungültig oder nicht ausgewählt. Bitte Key-Setup durchführen.");
+      } else {
+        setAnalysis("Fehler bei der Analyse. Bitte später erneut versuchen.");
+      }
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -139,6 +183,20 @@ export const App: React.FC = () => {
               </div>
               <button type="submit" className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl shadow-lg hover:bg-black transition-all">Verbinden & Speichern</button>
             </form>
+            
+            <div className="mt-8 pt-6 border-t border-gray-100">
+              <h4 className="text-sm font-bold text-gray-700 mb-2">KI-Schlüssel</h4>
+              <button 
+                onClick={handleOpenKeyPicker}
+                className="w-full py-3 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-all"
+              >
+                <Key size={16} />
+                Schlüssel auswählen / ändern
+              </button>
+              <p className="text-[10px] text-gray-400 mt-2 text-center">
+                Wird für die KI-Analyse benötigt. Nutze einen Key aus einem Projekt mit Abrechnung (ai.google.dev/gemini-api/docs/billing).
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -203,19 +261,22 @@ export const App: React.FC = () => {
                   <Sparkles className="text-blue-600" size={18} />
                   <h3 className="font-bold text-gray-800 text-sm">KI-Schwerpunktanalyse</h3>
                 </div>
-                <button 
-                  onClick={() => {
-                    setIsAnalyzing(true);
-                    analyzeDistribution(entries).then(res => {
-                      setAnalysis(res);
-                      setIsAnalyzing(false);
-                    });
-                  }}
-                  disabled={isAnalyzing || entries.length < 2}
-                  className="px-3 py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 transition-all disabled:opacity-30"
-                >
-                  {isAnalyzing ? "Analysiere..." : "Analyse starten"}
-                </button>
+                {!hasApiKey ? (
+                  <button 
+                    onClick={handleOpenKeyPicker}
+                    className="px-3 py-1.5 bg-orange-500 text-white text-[11px] font-bold rounded-lg hover:bg-orange-600 transition-all flex items-center gap-1.5 shadow-md shadow-orange-100"
+                  >
+                    <Key size={12} /> Key auswählen
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleStartAnalysis}
+                    disabled={isAnalyzing || entries.length < 2}
+                    className="px-3 py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 transition-all disabled:opacity-30 shadow-md shadow-blue-100"
+                  >
+                    {isAnalyzing ? "Analysiere..." : "Analyse starten"}
+                  </button>
+                )}
               </div>
               <div className="text-xs text-gray-600 italic leading-relaxed min-h-[40px]">
                 {analysis || (entries.length < 2 ? "Mindestens 2 Einträge für Analyse erforderlich." : "Klicke auf den Button für eine Zusammenfassung.")}
