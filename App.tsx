@@ -17,8 +17,8 @@ const DDLogo = () => {
             src="https://dealdepot.io/wp-content/uploads/2023/03/ddd-300x300.png" 
             alt="DD" 
             className="w-full h-full object-contain filter brightness-125"
-            crossOrigin="anonymous"
             onError={() => setImgError(true)}
+            /* crossOrigin entfernt, da der Server es nicht unterstützt */
           />
         ) : (
           <div className="flex flex-col items-center leading-none">
@@ -88,7 +88,6 @@ export const App: React.FC = () => {
       const success = await sync.pushEntry(entry);
       if (!success) {
         showToast("Cloud-Sync fehlgeschlagen. Speichere lokal...", "error");
-        // Fallback zu lokal
         const newEntries = [entry, ...entries];
         setEntries(newEntries);
         return true; 
