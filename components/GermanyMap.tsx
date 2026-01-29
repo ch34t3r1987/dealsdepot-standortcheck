@@ -1,38 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
 import { PLZEntry } from '../types';
 import { Flame, MapPin } from 'lucide-react';
+
+// Wir nutzen das globale 'L' von Leaflet, das via Script-Tag in index.html geladen wurde.
+declare const L: any;
 
 interface GermanyMapProps {
   entries: PLZEntry[];
 }
 
-// Erweitern des L Namespaces für das Heatmap Plugin, da es global geladen wird
-declare global {
-  namespace L {
-    function heatLayer(data: any[], options: any): any;
-  }
-}
-
 export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<L.Map | null>(null);
-  const markersLayer = useRef<L.LayerGroup | null>(null);
+  const mapInstance = useRef<any>(null);
+  const markersLayer = useRef<any>(null);
   const heatLayerInstance = useRef<any>(null);
   const [viewMode, setViewMode] = useState<'markers' | 'heatmap'>('markers');
-
-  // "Brücke" schlagen: Das Heatmap-Plugin hängt sich oft an das globale window.L
-  // Wenn wir Leaflet als Modul importieren, müssen wir sicherstellen, dass L.heatLayer verfügbar ist.
-  useEffect(() => {
-    const globalL = (window as any).L;
-    if (globalL && globalL.heatLayer && !L.heatLayer) {
-      (L as any).heatLayer = globalL.heatLayer;
-    }
-  }, []);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapInstance.current) return;
 
+    // Initialisierung der Karte
     mapInstance.current = L.map(mapContainerRef.current, {
       center: [51.1657, 10.4515],
       zoom: 6,
@@ -97,9 +84,11 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
           .addTo(markersLayer.current!);
       });
     } else {
-      // Heatmap Modus mit Fehler-Check
+      // Heatmap Modus
       if (typeof L.heatLayer === 'function') {
-        const heatData = entries.map(e => [e.lat, e.lng, 1.0]); // [lat, lng, intensity]
+        // Wir setzen die Intensität auf 1.0 pro Punkt
+        const heatData = entries.map(e => [e.lat, e.lng, 1.0]); 
+        
         heatLayerInstance.current = L.heatLayer(heatData, {
           radius: 20,
           blur: 15,
@@ -107,10 +96,11 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
           gradient: { 0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red' }
         }).addTo(mapInstance.current);
       } else {
-        console.error("Leaflet Heatmap Plugin ist nicht geladen.");
+        console.error("Heatmap Plugin nicht gefunden.");
       }
     }
 
+    // Auto-Zoom nur wenn Daten vorhanden
     if (entries.length > 0 && mapInstance.current) {
       const bounds = L.latLngBounds(entries.map(e => [e.lat, e.lng]));
       mapInstance.current.fitBounds(bounds.pad(0.2));
