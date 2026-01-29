@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, AlertCircle, Globe, RefreshCw } from 'lucide-react';
+import { Map as MapIcon, Trash2, Wifi, Settings, X, CheckCircle2, Clock, Sparkles, Loader2, Info } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry } from './types';
-import { analyzeDistribution } from './services/gemini';
 import * as sync from './services/syncService';
+import { analyzeDistribution } from './services/gemini';
 
 export const App: React.FC = () => {
   const [entries, setEntries] = useState<PLZEntry[]>([]);
-  const [analysis, setAnalysis] = useState<string>('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [config, setConfig] = useState(sync.getStoredConfig());
   const [notification, setNotification] = useState<string | null>(null);
-  const [keyError, setKeyError] = useState<string | null>(null);
+  
+  // KI-Analyse States
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   
   const entriesRef = useRef<PLZEntry[]>([]);
   entriesRef.current = entries;
@@ -53,23 +55,23 @@ export const App: React.FC = () => {
   };
 
   const handleStartAnalysis = async () => {
-    if (entries.length < 2) return;
-    
+    if (entries.length < 2) {
+      showToast("Nicht genügend Daten für eine Analyse (min. 2).");
+      return;
+    }
+
     setIsAnalyzing(true);
-    setKeyError(null);
+    setAnalysisError(null);
+    setAnalysisResult(null);
+
     try {
-      const res = await analyzeDistribution(entries);
-      setAnalysis(res);
+      const result = await analyzeDistribution(entries);
+      setAnalysisResult(result);
+      showToast("KI-Analyse erfolgreich abgeschlossen!");
     } catch (err: any) {
-      console.error("Analyse-Error:", err);
-      // Wenn der Key fehlt oder ungültig ist
-      if (err.message === "API_KEY_MISSING") {
-        setKeyError("Key nicht geladen.");
-      } else if (err.status === 400 || err.message?.includes("key not valid")) {
-        setKeyError("Google lehnt den Key ab.");
-      } else {
-        setAnalysis("KI-Dienst momentan nicht erreichbar.");
-      }
+      console.error("Fehler bei der KI-Analyse:", err);
+      setAnalysisError("Die Analyse konnte nicht gestartet werden. Prüfen Sie den API_KEY.");
+      showToast("Fehler bei der KI-Analyse.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -157,14 +159,50 @@ export const App: React.FC = () => {
               <PLZInput onAdd={handleAddEntry} />
             </section>
             
-            <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex-1">
               <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between font-bold text-gray-700 text-sm">
                 <div className="flex items-center gap-2"><Clock size={16} className="text-blue-600" /> Einträge</div>
-                <span className="text-[10px] bg-white border border-gray-200 px-2 py-0.5 rounded-full text-gray-500 uppercase">{entries.length}</span>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={handleStartAnalysis}
+                    disabled={isAnalyzing || entries.length < 2}
+                    className="flex items-center gap-2 text-[10px] bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold uppercase tracking-wider shadow-sm"
+                  >
+                    {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                    KI-Analyse
+                  </button>
+                  <span className="text-[10px] bg-white border border-gray-200 px-2 py-0.5 rounded-full text-gray-500 uppercase">{entries.length}</span>
+                </div>
               </div>
-              <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
+
+              {/* Analyse-Ergebnis Bereich */}
+              {(analysisResult || analysisError) && (
+                <div className={`m-4 p-4 rounded-xl border animate-in fade-in slide-in-from-top-2 duration-300 ${analysisError ? 'bg-red-50 border-red-100' : 'bg-blue-50 border-blue-100'}`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`p-1.5 rounded-lg ${analysisError ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                      {analysisError ? <Info size={16} /> : <Sparkles size={16} />}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className={`text-xs font-bold uppercase tracking-wider mb-1 ${analysisError ? 'text-red-700' : 'text-blue-700'}`}>
+                        {analysisError ? 'Fehler' : 'KI-Erkenntnis'}
+                      </h4>
+                      <p className={`text-sm leading-relaxed ${analysisError ? 'text-red-600' : 'text-blue-900 font-medium'}`}>
+                        {analysisError || analysisResult}
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => { setAnalysisResult(null); setAnalysisError(null); }}
+                      className="text-gray-400 hover:text-gray-600 p-1"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="max-h-[450px] overflow-y-auto custom-scrollbar">
                 {entries.length === 0 ? <div className="p-10 text-center text-gray-400 text-sm italic">Noch keine Daten...</div> : 
-                  entries.slice(0, 10).map((entry) => (
+                  entries.map((entry) => (
                     <div key={entry.id} className="px-5 py-4 border-b border-gray-50 flex items-center justify-between group hover:bg-blue-50/30 transition-all">
                       <div className="flex gap-4 items-center">
                         <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">{entry.country}</div>
@@ -177,53 +215,6 @@ export const App: React.FC = () => {
                     </div>
                   ))
                 }
-              </div>
-            </section>
-
-            <section className={`bg-white rounded-2xl p-6 border transition-all ${keyError ? 'border-red-200 bg-red-50/30' : 'border-gray-100 shadow-sm'}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className={keyError ? 'text-red-500' : 'text-blue-600'} size={18} />
-                  <h3 className="font-bold text-gray-800 text-sm">KI-Analyse</h3>
-                </div>
-                <button 
-                  onClick={handleStartAnalysis} 
-                  disabled={isAnalyzing || entries.length < 2} 
-                  className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-30 transition-all shadow-lg shadow-blue-100 flex items-center gap-2"
-                >
-                  {isAnalyzing ? "Analysiere..." : "Starten"}
-                </button>
-              </div>
-
-              {keyError && (
-                <div className="mb-4 space-y-3">
-                  <div className="flex items-start gap-3 p-4 bg-red-100/50 rounded-xl border border-red-200">
-                    <AlertCircle className="text-red-600 shrink-0 mt-0.5" size={18} />
-                    <div className="text-xs">
-                      <p className="font-bold text-red-900 mb-1">Deployment-Problem erkannt</p>
-                      <p className="text-red-800 leading-tight">
-                        Vercel hat den neuen Key noch nicht in die App geladen. Dein Key im Dashboard sieht korrekt aus!
-                      </p>
-                    </div>
-                  </div>
-                  <div className="bg-white p-4 rounded-xl border border-gray-100 space-y-3 shadow-sm">
-                    <p className="text-[11px] font-bold text-gray-700 uppercase flex items-center gap-2">
-                      <RefreshCw size={12} className="text-blue-500" /> So löst du es:
-                    </p>
-                    <ol className="text-[11px] text-gray-600 space-y-2 list-decimal pl-4">
-                      <li>Klicke in Vercel oben auf <strong>Deployments</strong>.</li>
-                      <li>Klicke beim obersten (neuesten) Eintrag auf die <strong>drei Punkte (...)</strong>.</li>
-                      <li>Wähle <strong>Redeploy</strong> und bestätige.</li>
-                    </ol>
-                    <p className="text-[10px] text-gray-400 italic">
-                      Hinweis: Ohne diesen Schritt "denkt" die App, der Key wäre leer oder ungültig.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className={`text-xs italic leading-relaxed min-h-[40px] p-4 rounded-xl border ${keyError ? 'bg-white/50 border-red-100 text-red-400' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
-                {analysis || (entries.length < 2 ? "Füge mindestens 2 Personen hinzu." : "Bereit.")}
               </div>
             </section>
           </div>
