@@ -1,24 +1,35 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Trash2, Wifi, Settings, X, CheckCircle2, Clock, Search, Filter, MapPin, Eraser } from 'lucide-react';
+import { Trash2, Wifi, Settings, X, CheckCircle2, Clock, Search, Filter, MapPin, Eraser, Map as MapIcon } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry, CountryCode } from './types';
 import { DE_STATES, getCoordsForPLZ } from './utils/plzData';
 import * as sync from './services/syncService';
 
-const DDLogo = () => (
-  <div className="flex items-center justify-center w-12 h-12 overflow-hidden rounded-xl bg-white/5 p-1 border border-white/10">
-    <img 
-      src="https://dealdepot.io/wp-content/uploads/2023/03/ddd-300x300.png" 
-      alt="DealDepot Logo" 
-      className="w-full h-full object-contain filter brightness-110"
-      onError={(e) => {
-        // Fallback falls das Bild nicht lädt
-        (e.target as HTMLImageElement).src = "https://ui-avatars.com/api/?name=DD&background=32c7a3&color=fff";
-      }}
-    />
-  </div>
-);
+const DDLogo = () => {
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <div className="flex items-center justify-center w-12 h-12 overflow-hidden rounded-xl bg-gradient-to-br from-[#32c7a3] to-[#25a083] p-0.5 border border-white/20 shadow-lg group relative">
+      <div className="w-full h-full bg-[#1a1a1a] rounded-[10px] flex items-center justify-center font-black text-white text-sm tracking-tighter select-none relative overflow-hidden">
+        {!imgError ? (
+          <img 
+            src="https://dealdepot.io/wp-content/uploads/2023/03/ddd-300x300.png" 
+            alt="DD" 
+            className="w-full h-full object-contain filter brightness-125"
+            crossOrigin="anonymous"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="flex flex-col items-center leading-none">
+            <span className="text-[#32c7a3] text-[10px] font-black">DEAL</span>
+            <span className="text-white text-[10px] font-black">DEPOT</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const App: React.FC = () => {
   const [entries, setEntries] = useState<PLZEntry[]>([]);
@@ -35,7 +46,6 @@ export const App: React.FC = () => {
   const entriesRef = useRef<PLZEntry[]>([]);
   entriesRef.current = entries;
 
-  // Reset state filter when country changes
   useEffect(() => {
     setStateFilter('ALL');
   }, [countryFilter]);
@@ -101,27 +111,19 @@ export const App: React.FC = () => {
     setStateFilter('ALL');
   };
 
-  // Filter Logic with dynamic state fallback for legacy data
   const filteredEntries = useMemo(() => {
     return entries.filter(entry => {
-      // 1. Search matching (nickname or city)
       const matchesSearch = searchTerm === '' || 
                             entry.nickname.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (entry.city && entry.city.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      // 2. Country matching
       const matchesCountry = countryFilter === 'ALL' || entry.country === countryFilter;
       
-      // 3. State matching (compute state if missing in entry)
       let effectiveState = entry.state;
       if (!effectiveState && entry.code) {
-        // Fallback: Compute state on the fly if it wasn't saved (for old entries)
         const coords = getCoordsForPLZ(entry.code, entry.country);
         effectiveState = coords.state;
       }
-      
       const matchesState = stateFilter === 'ALL' || effectiveState === stateFilter;
-      
       return matchesSearch && matchesCountry && matchesState;
     });
   }, [entries, searchTerm, countryFilter, stateFilter]);
@@ -129,7 +131,7 @@ export const App: React.FC = () => {
   const isFilterActive = searchTerm !== '' || countryFilter !== 'ALL' || stateFilter !== 'ALL';
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] pb-12 font-sans text-gray-200">
+    <div className="min-h-screen bg-[#0f0f0f] pb-12 font-sans text-gray-200">
       {notification && (
         <div className="fixed top-24 right-4 z-[9999] animate-bounce-in">
           <div className="bg-[#32c7a3] text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/20">
@@ -139,11 +141,11 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      <header className="bg-[#1a1a1a]/80 border-b border-white/5 sticky top-0 z-50 backdrop-blur-xl">
+      <header className="bg-[#0f0f0f]/80 border-b border-white/5 sticky top-0 z-50 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <DDLogo />
-            <h1 className="text-xl font-bold tracking-tight text-white">
+            <h1 className="text-xl font-black tracking-tight text-white hidden sm:block">
               DealDepot <span className="text-[#32c7a3]">Standortcheck</span>
             </h1>
           </div>
@@ -155,8 +157,7 @@ export const App: React.FC = () => {
             </div>
             <button 
               onClick={() => setShowSettings(true)} 
-              className="p-2.5 bg-white/5 rounded-xl text-gray-400 hover:text-[#32c7a3] hover:bg-[#32c7a3]/10 transition-all"
-              title="Cloud Sync Einstellungen"
+              className="p-2.5 bg-white/5 rounded-xl text-gray-400 hover:text-[#32c7a3] hover:bg-[#32c7a3]/10 transition-all border border-white/5"
             >
               <Settings size={20} />
             </button>
@@ -168,19 +169,19 @@ export const App: React.FC = () => {
       </header>
 
       {showSettings && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[10000] flex items-center justify-center p-4">
-          <div className="bg-[#242424] border border-white/10 rounded-3xl w-full max-w-md p-8 shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[10000] flex items-center justify-center p-4">
+          <div className="bg-[#161616] border border-white/10 rounded-3xl w-full max-w-md p-8 shadow-2xl relative">
             <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
               <X size={24} />
             </button>
             <h3 className="text-2xl font-bold mb-2 flex items-center gap-2 text-white">
               <Wifi className="text-[#32c7a3]" /> Cloud Sync
             </h3>
-            <p className="text-gray-400 text-sm mb-6">Verbinde die App mit deiner Supabase Datenbank für Realtime-Sync.</p>
+            <p className="text-gray-400 text-sm mb-6">Realtime-Datenbank Anbindung.</p>
             <form onSubmit={(e) => { e.preventDefault(); sync.saveConfig(config.url, config.key); window.location.reload(); }} className="space-y-4">
               <input type="text" value={config.url} onChange={e => setConfig({...config, url: e.target.value})} placeholder="Supabase URL" className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 text-white outline-none focus:ring-2 focus:ring-[#32c7a3]" />
               <input type="password" value={config.key} onChange={e => setConfig({...config, key: e.target.value})} placeholder="Anon Key" className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 text-white outline-none focus:ring-2 focus:ring-[#32c7a3]" />
-              <button type="submit" className="w-full py-4 bg-[#32c7a3] text-white font-bold rounded-xl hover:brightness-110 transition-all">Konfiguration Speichern</button>
+              <button type="submit" className="w-full py-4 bg-[#32c7a3] text-white font-bold rounded-xl hover:brightness-110 transition-all">Speichern</button>
             </form>
           </div>
         </div>
@@ -191,121 +192,101 @@ export const App: React.FC = () => {
           <div className="lg:col-span-5 flex flex-col gap-10">
             <section className="space-y-6">
               <div className="space-y-4">
-                <h2 className="text-5xl font-black text-white leading-tight">
+                <h2 className="text-6xl font-black text-white leading-[1.1] tracking-tight">
                   Woher kommt <br/>
                   <span className="text-[#32c7a3]">eure Gruppe?</span>
                 </h2>
-                <p className="text-gray-400 text-lg max-w-md">
-                  Visualisiere die Herkunft deiner Community in Echtzeit auf einer interaktiven Karte.
+                <p className="text-gray-400 text-lg max-w-md font-medium">
+                  Deine Community-Verteilung mit maximaler PLZ-Präzision.
                 </p>
               </div>
               <PLZInput onAdd={handleAddEntry} />
             </section>
             
-            <section className="bg-white/5 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl flex flex-col">
-              <div className="px-6 py-5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between font-bold text-gray-200">
+            <section className="bg-white/5 rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl flex flex-col">
+              <div className="px-8 py-6 border-b border-white/10 bg-white/[0.02] flex items-center justify-between font-bold text-gray-200">
                 <div className="flex items-center gap-3">
                   <Clock size={18} className="text-[#32c7a3]" /> 
-                  <span className="text-sm">Teilnehmerliste</span>
+                  <span className="text-xs uppercase tracking-[0.2em] font-black opacity-80">Teilnehmer</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {isFilterActive && (
                     <button 
                       onClick={resetFilters}
-                      className="text-[10px] text-gray-500 hover:text-red-400 transition-colors flex items-center gap-1 uppercase tracking-widest font-bold"
+                      className="text-[10px] text-gray-500 hover:text-[#32c7a3] transition-colors flex items-center gap-1 uppercase tracking-widest font-black"
                     >
-                      <Eraser size={12} /> Filter zurücksetzen
+                      <Eraser size={12} /> Filter aus
                     </button>
                   )}
-                  <span className="text-xs bg-[#32c7a3] px-2.5 py-1 rounded-full text-white">{filteredEntries.length} {filteredEntries.length === 1 ? 'Person' : 'Personen'}</span>
+                  <span className="text-[10px] font-black bg-[#32c7a3] px-3 py-1 rounded-full text-white uppercase tracking-wider">{filteredEntries.length} Aktiv</span>
                 </div>
               </div>
 
-              {/* Filter Area */}
-              <div className="p-5 bg-white/[0.01] border-b border-white/5 space-y-4">
+              <div className="p-6 bg-white/[0.01] border-b border-white/5 space-y-4">
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
                   <input 
                     type="text" 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Nickname oder Stadt suchen..."
+                    placeholder="Suche..."
                     className="w-full pl-11 pr-4 py-3 bg-white/5 rounded-xl border border-white/10 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-[#32c7a3] transition-all"
                   />
                 </div>
                 
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar scrollbar-hide">
-                    <Filter size={14} className="text-gray-500 shrink-0" />
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                  {['ALL', 'DE', 'AT', 'CH'].map(c => (
                     <button 
-                      onClick={() => setCountryFilter('ALL')}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 ${countryFilter === 'ALL' ? 'bg-[#32c7a3] text-white border-[#32c7a3]' : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'}`}
+                      key={c}
+                      onClick={() => setCountryFilter(c as any)}
+                      className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border shrink-0 ${countryFilter === c ? 'bg-[#32c7a3] text-white border-[#32c7a3] shadow-lg shadow-[#32c7a3]/20' : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'}`}
                     >
-                      Alle
+                      {c === 'ALL' ? 'Alle' : c}
                     </button>
-                    <button 
-                      onClick={() => setCountryFilter('DE')}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 ${countryFilter === 'DE' ? 'bg-[#32c7a3] text-white border-[#32c7a3]' : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'}`}
-                    >
-                      DE
-                    </button>
-                    <button 
-                      onClick={() => setCountryFilter('AT')}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 ${countryFilter === 'AT' ? 'bg-[#32c7a3] text-white border-[#32c7a3]' : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'}`}
-                    >
-                      AT
-                    </button>
-                    <button 
-                      onClick={() => setCountryFilter('CH')}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 ${countryFilter === 'CH' ? 'bg-[#32c7a3] text-white border-[#32c7a3]' : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'}`}
-                    >
-                      CH
-                    </button>
-                  </div>
-
-                  {countryFilter === 'DE' && (
-                    <div className="flex items-center gap-2 animate-bounce-in">
-                      <MapPin size={14} className="text-[#32c7a3] shrink-0" />
-                      <select 
-                        value={stateFilter}
-                        onChange={(e) => setStateFilter(e.target.value)}
-                        className="w-full bg-[#1a1a1a] border border-white/10 text-xs rounded-lg px-2 py-2 text-gray-300 outline-none focus:border-[#32c7a3] transition-colors cursor-pointer"
-                      >
-                        <option value="ALL">Alle Bundesländer</option>
-                        {DE_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                  )}
+                  ))}
                 </div>
+
+                {countryFilter === 'DE' && (
+                  <div className="flex items-center gap-2 animate-bounce-in">
+                    <MapPin size={14} className="text-[#32c7a3] shrink-0" />
+                    <select 
+                      value={stateFilter}
+                      onChange={(e) => setStateFilter(e.target.value)}
+                      className="w-full bg-[#1a1a1a] border border-white/10 text-xs font-bold rounded-lg px-3 py-2 text-gray-400 outline-none focus:border-[#32c7a3] transition-colors cursor-pointer"
+                    >
+                      <option value="ALL">Alle Bundesländer</option>
+                      {DE_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
 
-              <div className="max-h-[400px] overflow-y-auto custom-scrollbar divide-y divide-white/5">
+              <div className="max-h-[450px] overflow-y-auto custom-scrollbar divide-y divide-white/5">
                 {filteredEntries.length === 0 ? (
-                  <div className="p-12 text-center text-gray-500 text-sm italic">
-                    {entries.length === 0 ? 'Noch keine Teilnehmer eingetragen...' : 'Keine Ergebnisse für die gewählten Filter.'}
-                  </div>
+                  <div className="p-16 text-center text-gray-600 text-xs font-bold uppercase tracking-widest italic opacity-50">Keine Daten</div>
                 ) : (
                   filteredEntries.map((entry) => {
-                    // Fallback for list display too
                     let displayState = entry.state;
                     if (!displayState && entry.code) {
                       displayState = getCoordsForPLZ(entry.code, entry.country).state;
                     }
-                    
                     return (
-                      <div key={entry.id} className="px-6 py-5 flex items-center justify-between group hover:bg-white/[0.03] transition-all">
-                        <div className="flex gap-4 items-center">
-                          <div className="w-10 h-10 rounded-xl bg-[#32c7a3]/10 text-[#32c7a3] flex items-center justify-center font-bold text-sm border border-[#32c7a3]/20 uppercase">{entry.country}</div>
+                      <div key={entry.id} className="px-8 py-6 flex items-center justify-between group hover:bg-white/[0.04] transition-all cursor-default">
+                        <div className="flex gap-5 items-center">
+                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#32c7a3]/20 to-[#32c7a3]/5 text-[#32c7a3] flex items-center justify-center font-black text-[11px] border border-[#32c7a3]/30 uppercase shadow-inner">{entry.country}</div>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-white">{entry.nickname}</span>
-                              <span className="text-[10px] font-bold bg-white/10 text-gray-400 px-2 py-0.5 rounded uppercase tracking-wider">{entry.code}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-white text-base">{entry.nickname}</span>
+                              <span className="text-[10px] font-black bg-white/10 text-gray-400 px-2 py-0.5 rounded-md uppercase tracking-widest">{entry.code}</span>
                             </div>
-                            <div className="text-xs text-gray-500 mt-0.5 font-medium">{entry.city}{displayState ? ` (${displayState})` : ''}</div>
+                            <div className="text-[12px] text-gray-500 mt-1 font-semibold flex items-center gap-1.5">
+                              <MapPin size={12} className="opacity-50" />
+                              {entry.city} <span className="opacity-30">|</span> {displayState}
+                            </div>
                           </div>
                         </div>
-                        <button onClick={() => handleDeleteEntry(entry.id)} className="p-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                          <Trash2 size={18} />
+                        <button onClick={() => handleDeleteEntry(entry.id)} className="p-3 text-gray-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110">
+                          <Trash2 size={20} />
                         </button>
                       </div>
                     );
