@@ -24,12 +24,9 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
       zoomControl: true,
     });
 
-    // Hellen Kartenstil mit deutscher Beschriftung verwenden (OSM DE)
-    // Wir nutzen hier den Standard-OSM-Stil, der in Deutschland meist deutsche Labels hat,
-    // oder einen sauberen hellen Stil wie CartoDB Positron, falls OSM DE nicht verfügbar ist.
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap Mitwirkende',
-      subdomains: 'abc',
+    // Hellen Kartenstil mit GARANTIERT deutscher Beschriftung verwenden (OSM DE Tiles)
+    L.tileLayer('https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> Mitwirkende',
       maxZoom: 19
     }).addTo(mapInstance.current);
 
