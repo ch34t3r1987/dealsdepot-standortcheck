@@ -3,7 +3,7 @@ import { Trash2, Wifi, Settings, X, CheckCircle2, Clock, Search, Filter, MapPin,
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry, CountryCode } from './types';
-import { DE_STATES } from './utils/plzData';
+import { DE_STATES, getCoordsForPLZ } from './utils/plzData';
 import * as sync from './services/syncService';
 
 const DDLogo = () => (
@@ -97,19 +97,26 @@ export const App: React.FC = () => {
     setStateFilter('ALL');
   };
 
-  // Filter Logic
+  // Filter Logic with dynamic state fallback for legacy data
   const filteredEntries = useMemo(() => {
     return entries.filter(entry => {
-      // Search matching (nickname or city)
+      // 1. Search matching (nickname or city)
       const matchesSearch = searchTerm === '' || 
                             entry.nickname.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (entry.city && entry.city.toLowerCase().includes(searchTerm.toLowerCase()));
       
-      // Country matching
+      // 2. Country matching
       const matchesCountry = countryFilter === 'ALL' || entry.country === countryFilter;
       
-      // State matching (handle legacy data without 'state' property)
-      const matchesState = stateFilter === 'ALL' || (entry.state && entry.state === stateFilter);
+      // 3. State matching (compute state if missing in entry)
+      let effectiveState = entry.state;
+      if (!effectiveState && entry.code) {
+        // Fallback: Compute state on the fly if it wasn't saved (for old entries)
+        const coords = getCoordsForPLZ(entry.code, entry.country);
+        effectiveState = coords.state;
+      }
+      
+      const matchesState = stateFilter === 'ALL' || effectiveState === stateFilter;
       
       return matchesSearch && matchesCountry && matchesState;
     });
@@ -236,19 +243,19 @@ export const App: React.FC = () => {
                       onClick={() => setCountryFilter('DE')}
                       className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 ${countryFilter === 'DE' ? 'bg-[#32c7a3] text-white border-[#32c7a3]' : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'}`}
                     >
-                      DE 🇩🇪
+                      DE
                     </button>
                     <button 
                       onClick={() => setCountryFilter('AT')}
                       className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 ${countryFilter === 'AT' ? 'bg-[#32c7a3] text-white border-[#32c7a3]' : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'}`}
                     >
-                      AT 🇦🇹
+                      AT
                     </button>
                     <button 
                       onClick={() => setCountryFilter('CH')}
                       className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 ${countryFilter === 'CH' ? 'bg-[#32c7a3] text-white border-[#32c7a3]' : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'}`}
                     >
-                      CH 🇨🇭
+                      CH
                     </button>
                   </div>
 
@@ -274,23 +281,31 @@ export const App: React.FC = () => {
                     {entries.length === 0 ? 'Noch keine Teilnehmer eingetragen...' : 'Keine Ergebnisse für die gewählten Filter.'}
                   </div>
                 ) : (
-                  filteredEntries.map((entry) => (
-                    <div key={entry.id} className="px-6 py-5 flex items-center justify-between group hover:bg-white/[0.03] transition-all">
-                      <div className="flex gap-4 items-center">
-                        <div className="w-10 h-10 rounded-xl bg-[#32c7a3]/10 text-[#32c7a3] flex items-center justify-center font-bold text-sm border border-[#32c7a3]/20 uppercase">{entry.country}</div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-white">{entry.nickname}</span>
-                            <span className="text-[10px] font-bold bg-white/10 text-gray-400 px-2 py-0.5 rounded uppercase tracking-wider">{entry.code}</span>
+                  filteredEntries.map((entry) => {
+                    // Fallback for list display too
+                    let displayState = entry.state;
+                    if (!displayState && entry.code) {
+                      displayState = getCoordsForPLZ(entry.code, entry.country).state;
+                    }
+                    
+                    return (
+                      <div key={entry.id} className="px-6 py-5 flex items-center justify-between group hover:bg-white/[0.03] transition-all">
+                        <div className="flex gap-4 items-center">
+                          <div className="w-10 h-10 rounded-xl bg-[#32c7a3]/10 text-[#32c7a3] flex items-center justify-center font-bold text-sm border border-[#32c7a3]/20 uppercase">{entry.country}</div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white">{entry.nickname}</span>
+                              <span className="text-[10px] font-bold bg-white/10 text-gray-400 px-2 py-0.5 rounded uppercase tracking-wider">{entry.code}</span>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5 font-medium">{entry.city}{displayState ? ` (${displayState})` : ''}</div>
                           </div>
-                          <div className="text-xs text-gray-500 mt-0.5 font-medium">{entry.city}{entry.state ? ` (${entry.state})` : ''}</div>
                         </div>
+                        <button onClick={() => handleDeleteEntry(entry.id)} className="p-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                          <Trash2 size={18} />
+                        </button>
                       </div>
-                      <button onClick={() => handleDeleteEntry(entry.id)} className="p-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </section>
