@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, Key, AlertCircle, ExternalLink } from 'lucide-react';
+import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, Key, AlertCircle, ExternalLink, Info } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry } from './types';
@@ -13,7 +13,6 @@ declare global {
     openSelectKey: () => Promise<void>;
   }
   interface Window {
-    // Fixed: Made optional to ensure compatibility with potential existing declarations and avoid modifier mismatch errors.
     aistudio?: AIStudio;
   }
 }
@@ -65,43 +64,42 @@ export const App: React.FC = () => {
   };
 
   const handleSelectKey = async () => {
+    console.log("Klick auf: Jetzt Projekt verknüpfen");
     if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setKeyError(null);
-      // Nach dem Öffnen nehmen wir an, dass die Auswahl erfolgreich war (Race Condition Mitigation)
-      showToast("Projekt-Key wurde aktualisiert.");
+      try {
+        console.log("Rufe window.aistudio.openSelectKey() auf...");
+        await window.aistudio.openSelectKey();
+        setKeyError(null);
+        showToast("Projekt-Auswahl gestartet.");
+      } catch (err) {
+        console.error("Fehler beim Öffnen des Key-Dialogs:", err);
+        setKeyError("Der Dialog konnte nicht geöffnet werden. Bitte Browser-Popups prüfen.");
+      }
+    } else {
+      console.warn("window.aistudio ist nicht verfügbar");
+      setKeyError("Die Google AI Studio Schnittstelle ist in diesem Browser-Tab nicht aktiv. Bitte lade die Seite neu.");
     }
   };
 
   const handleStartAnalysis = async () => {
     if (entries.length < 2) return;
     
-    // Check if key is selected
-    if (window.aistudio) {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-        await window.aistudio.openSelectKey();
-        // Proceeding anyway as per guidelines
-      }
-    }
-
     setIsAnalyzing(true);
     setKeyError(null);
     try {
       const res = await analyzeDistribution(entries);
       setAnalysis(res);
     } catch (err: any) {
-      console.error(err);
-      // Fixed: Handle the specific "Requested entity was not found" error by prompting for key re-selection as required by guidelines.
-      if (err.message?.includes("Requested entity was not found.")) {
-        setKeyError("Abrechnung erforderlich oder Projekt nicht gefunden. Bitte Key erneut auswählen.");
+      console.error("Fehler in der Analyse:", err);
+      // "Requested entity was not found" oder 400 deutet meist auf fehlende Abrechnung oder falschen Key hin
+      if (err.message?.includes("Requested entity was not found") || err.status === 400 || err.message?.includes("API key not valid")) {
+        setKeyError("Der aktuelle Key ist ungültig oder hat keine Abrechnung hinterlegt.");
         if (window.aistudio) {
+          console.log("Automatischer Trigger des Key-Pickers aufgrund von API-Fehler");
           await window.aistudio.openSelectKey();
         }
-      } else if (err.message?.includes("API key not valid") || err.status === 400) {
-        setKeyError("Ungültiger API-Key. Bitte verknüpfe ein Projekt mit aktiver Abrechnung.");
       } else {
-        setAnalysis("Analyse fehlgeschlagen. Bitte später versuchen.");
+        setAnalysis("Analyse fehlgeschlagen. Bitte versuche es später erneut.");
       }
     } finally {
       setIsAnalyzing(false);
@@ -235,24 +233,31 @@ export const App: React.FC = () => {
                   <div className="flex items-start gap-3 p-3 bg-red-100/50 rounded-xl border border-red-100 mb-3">
                     <AlertCircle className="text-red-600 shrink-0 mt-0.5" size={16} />
                     <div>
-                      <p className="text-xs font-bold text-red-900">API-Key Fehler</p>
+                      <p className="text-xs font-bold text-red-900">API-Key erforderlich</p>
                       <p className="text-[11px] text-red-700 leading-tight mt-1">{keyError}</p>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-3">
+                    <div className="bg-white/80 p-3 rounded-xl border border-red-50 text-[10px] text-gray-600 flex items-start gap-2 shadow-sm">
+                      <Info size={12} className="text-blue-500 shrink-0 mt-0.5" />
+                      <div>
+                        Wähle im folgenden Dialog ein <strong>Google Cloud Projekt mit aktivierter Abrechnung</strong> aus. 
+                        Der Key wird dann automatisch im Hintergrund hinterlegt.
+                      </div>
+                    </div>
                     <button 
                       onClick={handleSelectKey}
-                      className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-100"
+                      className="w-full flex items-center justify-center gap-2 py-4 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 transition-all shadow-xl shadow-red-200 animate-pulse-slow"
                     >
-                      <Key size={14} /> Jetzt Projekt verknüpfen
+                      <Key size={18} /> Jetzt Projekt auswählen
                     </button>
                     <a 
                       href="https://ai.google.dev/gemini-api/docs/billing" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-[10px] text-gray-500 flex items-center justify-center gap-1 hover:text-blue-600 transition-colors"
+                      className="text-[10px] text-gray-500 flex items-center justify-center gap-1 hover:text-blue-600 transition-colors underline underline-offset-2"
                     >
-                      Abrechnungs-Doku öffnen <ExternalLink size={10} />
+                      Dokumentation zur Abrechnung öffnen <ExternalLink size={10} />
                     </a>
                   </div>
                 </div>
