@@ -1,10 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock } from 'lucide-react';
+import { Map as MapIcon, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock, Key, AlertCircle, ExternalLink } from 'lucide-react';
 import { PLZInput } from './components/PLZInput';
 import { GermanyMap } from './components/GermanyMap';
 import { PLZEntry } from './types';
 import { analyzeDistribution } from './services/gemini';
 import * as sync from './services/syncService';
+
+// AI Studio Integration Types
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+  interface Window {
+    // Fixed: Made optional to ensure compatibility with potential existing declarations and avoid modifier mismatch errors.
+    aistudio?: AIStudio;
+  }
+}
 
 export const App: React.FC = () => {
   const [entries, setEntries] = useState<PLZEntry[]>([]);
@@ -14,6 +26,7 @@ export const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [config, setConfig] = useState(sync.getStoredConfig());
   const [notification, setNotification] = useState<string | null>(null);
+  const [keyError, setKeyError] = useState<string | null>(null);
   
   const entriesRef = useRef<PLZEntry[]>([]);
   entriesRef.current = entries;
@@ -51,6 +64,50 @@ export const App: React.FC = () => {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  const handleSelectKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      setKeyError(null);
+      // Nach dem Öffnen nehmen wir an, dass die Auswahl erfolgreich war (Race Condition Mitigation)
+      showToast("Projekt-Key wurde aktualisiert.");
+    }
+  };
+
+  const handleStartAnalysis = async () => {
+    if (entries.length < 2) return;
+    
+    // Check if key is selected
+    if (window.aistudio) {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        await window.aistudio.openSelectKey();
+        // Proceeding anyway as per guidelines
+      }
+    }
+
+    setIsAnalyzing(true);
+    setKeyError(null);
+    try {
+      const res = await analyzeDistribution(entries);
+      setAnalysis(res);
+    } catch (err: any) {
+      console.error(err);
+      // Fixed: Handle the specific "Requested entity was not found" error by prompting for key re-selection as required by guidelines.
+      if (err.message?.includes("Requested entity was not found.")) {
+        setKeyError("Abrechnung erforderlich oder Projekt nicht gefunden. Bitte Key erneut auswählen.");
+        if (window.aistudio) {
+          await window.aistudio.openSelectKey();
+        }
+      } else if (err.message?.includes("API key not valid") || err.status === 400) {
+        setKeyError("Ungültiger API-Key. Bitte verknüpfe ein Projekt mit aktiver Abrechnung.");
+      } else {
+        setAnalysis("Analyse fehlgeschlagen. Bitte später versuchen.");
+      }
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const handleAddEntry = async (entry: PLZEntry) => {
     if (isLive) {
       const success = await sync.pushEntry(entry);
@@ -70,19 +127,6 @@ export const App: React.FC = () => {
         setEntries(newEntries);
         localStorage.setItem('plz-votes', JSON.stringify(newEntries));
       }
-    }
-  };
-
-  const handleStartAnalysis = async () => {
-    if (entries.length < 2) return;
-    setIsAnalyzing(true);
-    try {
-      const res = await analyzeDistribution(entries);
-      setAnalysis(res);
-    } catch (err) {
-      setAnalysis("Analyse fehlgeschlagen.");
-    } finally {
-      setIsAnalyzing(false);
     }
   };
 
@@ -169,14 +213,52 @@ export const App: React.FC = () => {
               </div>
             </section>
 
-            <section className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <section className={`bg-white rounded-2xl p-6 border transition-all ${keyError ? 'border-red-200 bg-red-50/30' : 'border-gray-100 shadow-sm'}`}>
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2"><Sparkles className="text-blue-600" size={18} /><h3 className="font-bold text-gray-800 text-sm">KI-Analyse</h3></div>
-                <button onClick={handleStartAnalysis} disabled={isAnalyzing || entries.length < 2} className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-30 transition-all shadow-lg shadow-blue-100">
-                  {isAnalyzing ? "Analysiere..." : "Starten"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <Sparkles className={keyError ? 'text-red-500' : 'text-blue-600'} size={18} />
+                  <h3 className="font-bold text-gray-800 text-sm">KI-Analyse</h3>
+                </div>
+                {!keyError && (
+                  <button 
+                    onClick={handleStartAnalysis} 
+                    disabled={isAnalyzing || entries.length < 2} 
+                    className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-30 transition-all shadow-lg shadow-blue-100 flex items-center gap-2"
+                  >
+                    {isAnalyzing ? "Analysiere..." : <><Sparkles size={14} /> Starten</>}
+                  </button>
+                )}
               </div>
-              <div className="text-xs text-gray-600 italic leading-relaxed min-h-[40px] bg-gray-50 p-4 rounded-xl border border-gray-100">
+
+              {keyError && (
+                <div className="mb-4">
+                  <div className="flex items-start gap-3 p-3 bg-red-100/50 rounded-xl border border-red-100 mb-3">
+                    <AlertCircle className="text-red-600 shrink-0 mt-0.5" size={16} />
+                    <div>
+                      <p className="text-xs font-bold text-red-900">API-Key Fehler</p>
+                      <p className="text-[11px] text-red-700 leading-tight mt-1">{keyError}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button 
+                      onClick={handleSelectKey}
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-100"
+                    >
+                      <Key size={14} /> Jetzt Projekt verknüpfen
+                    </button>
+                    <a 
+                      href="https://ai.google.dev/gemini-api/docs/billing" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-gray-500 flex items-center justify-center gap-1 hover:text-blue-600 transition-colors"
+                    >
+                      Abrechnungs-Doku öffnen <ExternalLink size={10} />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              <div className={`text-xs italic leading-relaxed min-h-[40px] p-4 rounded-xl border ${keyError ? 'bg-white/50 border-red-100 text-red-400' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
                 {analysis || (entries.length < 2 ? "Füge mindestens 2 Personen hinzu." : "Bereit für die Analyse.")}
               </div>
             </section>
