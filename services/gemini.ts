@@ -7,24 +7,24 @@ import { PLZEntry } from "../types";
 export async function analyzeDistribution(entries: PLZEntry[]): Promise<string> {
   if (entries.length === 0) return "Keine Daten vorhanden.";
 
+  // Wir nutzen gemini-3-flash-preview für diese Basis-Textaufgabe
+  const modelName = 'gemini-3-flash-preview';
+
   try {
-    // Fixed: Always create a new instance right before use to ensure it picks up the latest API key from context.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     
     const plzList = entries.map(e => `${e.code} (${e.city}, ${e.country})`).join(", ");
     
-    // Fixed: Using the simple string content for generateContent as per documentation examples for basic text tasks.
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: modelName,
       contents: `Analysiere kurz diese Postleitzahlen-Liste einer Gruppe aus der DACH-Region: [${plzList}]. 
-          Wo liegen die geografischen Schwerpunkte? Antworte in 1-2 prägnanten Sätzen auf Deutsch.`,
+          Wo liegen die geografischen Schwerpunkte? Antworte in maximal zwei Sätzen auf Deutsch.`,
     });
     
-    // Fixed: Access the .text property directly (not a function) to get the string output.
     return response.text || "Analyse abgeschlossen.";
   } catch (error: any) {
     console.error("Gemini API Fehler:", error);
-    // Wir werfen den Fehler weiter, damit die UI darauf reagieren kann
+    // Wir werfen den Fehler für die UI weiter
     throw error;
   }
 }
