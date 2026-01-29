@@ -82,20 +82,32 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
       });
     } else {
       if (typeof L.heatLayer === 'function' && entries.length > 0) {
-        const heatData = entries.map(e => [e.lat, e.lng, 1.0]); 
+        // Wir übergeben Intensität (3. Wert) basierend auf Anzahl der Punkte an dieser Stelle
+        // Wenn 5 Personen an einem Ort sind, wird dieser Punkt "heißer".
+        const pointMap: Record<string, [number, number, number]> = {};
+        entries.forEach(e => {
+          const key = `${e.lat.toFixed(3)},${e.lng.toFixed(3)}`;
+          if (!pointMap[key]) {
+            pointMap[key] = [e.lat, e.lng, 0];
+          }
+          pointMap[key][2] += 0.4; // Jede Person erhöht die Hitze um 0.4
+        });
+
+        const heatData = Object.values(pointMap); 
         
         heatLayerInstance.current = L.heatLayer(heatData, {
-          radius: 35,
-          blur: 20,
-          maxZoom: 10,
-          max: 1.0,
-          minOpacity: 0.5,
+          radius: 40, // Größerer Radius für besseres Blending
+          blur: 25,
+          maxZoom: 9,
+          max: 1.0, // Bei 1.0 ist die maximale Farbe erreicht (ca. 3 Personen)
+          minOpacity: 0.4,
           gradient: {
-            0.2: '#e5f9f5',
-            0.4: '#b2eddf',
-            0.6: '#65dcc1',
-            0.8: '#32c7a3',
-            1.0: '#25a083'
+            0.1: '#e5f9f5', // Sehr helles Türkis
+            0.3: '#b2eddf', // Helles Türkis
+            0.5: '#65dcc1', // Mittleres Türkis
+            0.7: '#32c7a3', // DealDepot Teal
+            0.8: '#f59e0b', // Amber/Orange bei Clustern
+            1.0: '#ef4444'  // Tiefrot bei starken Hotspots
           }
         }).addTo(mapInstance.current);
 
@@ -116,13 +128,13 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
       <div className="absolute top-6 right-6 z-[1000] flex bg-white p-1.5 rounded-2xl shadow-xl border border-gray-100">
         <button 
           onClick={() => setViewMode('markers')}
-          className={`px-5 py-2.5 flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all rounded-xl ${viewMode === 'markers' ? 'bg-[#32c7a3] text-white' : 'text-gray-500 hover:text-gray-900'}`}
+          className={`px-5 py-2.5 flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all rounded-xl ${viewMode === 'markers' ? 'bg-[#32c7a3] text-white shadow-lg' : 'text-gray-500 hover:text-gray-900'}`}
         >
           <MapPin size={14} /> Karte
         </button>
         <button 
           onClick={() => setViewMode('heatmap')}
-          className={`px-5 py-2.5 flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all rounded-xl ${viewMode === 'heatmap' ? 'bg-[#32c7a3] text-white' : 'text-gray-500 hover:text-gray-900'}`}
+          className={`px-5 py-2.5 flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all rounded-xl ${viewMode === 'heatmap' ? 'bg-[#32c7a3] text-white shadow-lg' : 'text-gray-500 hover:text-gray-900'}`}
         >
           <Flame size={14} /> Heatmap
         </button>
