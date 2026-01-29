@@ -8,36 +8,29 @@ export async function analyzeDistribution(entries: PLZEntry[]): Promise<string> 
   if (entries.length === 0) return "Keine Daten vorhanden.";
 
   try {
-    // Priorisiere APIGEM_KEY (den du gerade angelegt hast)
-    const apiKey = (process.env.APIGEM_KEY || process.env.API_KEY || "").trim();
+    // Wir versuchen alle gängigen Wege, an den Key zu kommen
+    // In manchen Umgebungen wird process.env vom Build-Tool durch den String "undefined" ersetzt
+    const rawKey = process.env.APIGEM_KEY || process.env.API_KEY || "";
+    const apiKey = typeof rawKey === 'string' ? rawKey.trim() : "";
     
-    if (!apiKey || apiKey === "undefined" || apiKey === "null") {
-      console.error("API Key fehlt komplett in der Umgebung.");
+    // Prüfe auf leere Werte oder den String "undefined"
+    if (!apiKey || apiKey === "" || apiKey === "undefined" || apiKey === "null") {
+      console.error("API Key wurde nicht gefunden oder ist der String 'undefined'");
       throw new Error("API_KEY_MISSING");
-    }
-
-    // Ein gültiger Google API Key beginnt fast immer mit 'AIza'
-    if (!apiKey.startsWith("AIza")) {
-      console.error("Der gefundene Key scheint kein gültiger Google API Key zu sein (startet nicht mit AIza).");
-      throw new Error("API_KEY_INVALID_FORMAT");
     }
 
     const ai = new GoogleGenAI({ apiKey });
     const plzList = entries.map(e => `${e.code} (${e.city}, ${e.country})`).join(", ");
     
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-latest', // Stabilerer Alias
+      model: 'gemini-3-flash-preview', 
       contents: `Analysiere kurz diese Postleitzahlen-Liste einer Gruppe aus der DACH-Region: [${plzList}]. 
           Wo liegen die geografischen Schwerpunkte? Antworte in maximal zwei Sätzen auf Deutsch.`,
     });
     
-    if (!response || !response.text) {
-      throw new Error("EMPTY_RESPONSE");
-    }
-
-    return response.text;
+    return response.text || "Analyse abgeschlossen.";
   } catch (error: any) {
-    console.error("Detaillierter Gemini API Fehler:", error);
+    console.error("Gemini API Fehler:", error);
     throw error;
   }
 }
