@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DealsDepot Standortcheck</title>
+    <title>DealDepot Standortcheck</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <!-- Leaflet JS -->
@@ -13,18 +13,25 @@
     <!-- Leaflet Heatmap Plugin -->
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <style>
-      body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+      body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; scroll-behavior: smooth; }
       .custom-scrollbar::-webkit-scrollbar { width: 6px; }
       .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-      .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
-      .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
-      .leaflet-container { font-family: 'Inter', sans-serif; }
-      @keyframes pulse-green {
-        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(50, 199, 163, 0.3); }
+      .leaflet-container { font-family: 'Inter', sans-serif; background: #1a1a1a !important; }
+      @keyframes pulse-teal {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(50, 199, 163, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(50, 199, 163, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(50, 199, 163, 0); }
       }
-      .live-pulse { animation: pulse-green 2s infinite; }
+      .live-pulse { animation: pulse-teal 2s infinite; }
+      @keyframes bounce-in {
+        0% { transform: scale(0.3); opacity: 0; }
+        50% { transform: scale(1.05); }
+        70% { transform: scale(0.9); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .animate-bounce-in { animation: bounce-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     </style>
     <script type="importmap">
 {
@@ -41,7 +48,7 @@
 }
 </script>
   </head>
-  <body class="bg-gray-50 text-gray-900">
+  <body class="bg-[#1a1a1a] text-gray-200">
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
   </body>
