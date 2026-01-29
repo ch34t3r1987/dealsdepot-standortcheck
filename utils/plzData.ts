@@ -1,6 +1,6 @@
 import { PLZRegion, CountryCode } from '../types';
 
-// Alle 95 deutschen Leitregionen (2-Steller) für hohe Genauigkeit
+// Alle 95 deutschen Leitregionen (2-Steller)
 const DE_REGIONS: Record<string, PLZRegion> = {
   "01": { prefix: "01", name: "Dresden", lat: 51.0504, lng: 13.7373 },
   "02": { prefix: "02", name: "Bautzen", lat: 51.1814, lng: 14.4251 },
@@ -98,20 +98,40 @@ const DE_REGIONS: Record<string, PLZRegion> = {
   "99": { prefix: "99", name: "Erfurt", lat: 50.9781, lng: 11.0292 },
 };
 
-export function getCoordsForPLZ(plz: string, country: CountryCode): { lat: number; lng: number, region: string } {
-  if (country === 'DE') {
-    // 1. Suche nach exakter 2-Steller Leitregion (Höchste Präzision)
-    const prefix2 = plz.substring(0, 2);
-    if (DE_REGIONS[prefix2]) {
-      return { 
-        lat: DE_REGIONS[prefix2].lat, 
-        lng: DE_REGIONS[prefix2].lng, 
-        region: DE_REGIONS[prefix2].name 
-      };
-    }
+// Österreichische Leitzonen (Bundesländer)
+const AT_REGIONS: Record<string, PLZRegion> = {
+  "1": { prefix: "1", name: "Wien", lat: 48.2082, lng: 16.3738 },
+  "2": { prefix: "2", name: "Niederösterreich Ost", lat: 48.4000, lng: 16.5000 },
+  "3": { prefix: "3", name: "Niederösterreich West", lat: 48.2000, lng: 15.6000 },
+  "4": { prefix: "4", name: "Oberösterreich", lat: 48.3064, lng: 14.2858 },
+  "5": { prefix: "5", name: "Salzburg", lat: 47.8095, lng: 13.0550 },
+  "6": { prefix: "6", name: "Tirol / Vorarlberg", lat: 47.2692, lng: 11.4041 },
+  "7": { prefix: "7", name: "Burgenland", lat: 47.8444, lng: 16.5233 },
+  "8": { prefix: "8", name: "Steiermark", lat: 47.0707, lng: 15.4395 },
+  "9": { prefix: "9", name: "Kärnten", lat: 46.6247, lng: 14.3053 },
+};
 
-    // 2. Fallback auf 1-Steller Zone
-    const firstDigit = plz.substring(0, 1);
+// Schweizer Postkreis-Regionen
+const CH_REGIONS: Record<string, PLZRegion> = {
+  "1": { prefix: "1", name: "Westschweiz (Lausanne/Genf)", lat: 46.5197, lng: 6.6323 },
+  "2": { prefix: "2", name: "Westschweiz (Neuchâtel/Jura)", lat: 46.9896, lng: 6.9293 },
+  "3": { prefix: "3", name: "Bern / Oberwallis", lat: 46.9480, lng: 7.4474 },
+  "4": { prefix: "4", name: "Basel", lat: 47.5596, lng: 7.5886 },
+  "5": { prefix: "5", name: "Aargau", lat: 47.3925, lng: 8.0442 },
+  "6": { prefix: "6", name: "Zentralschweiz / Tessin", lat: 47.0502, lng: 8.3093 },
+  "7": { prefix: "7", name: "Graubünden", lat: 46.8508, lng: 9.5320 },
+  "8": { prefix: "8", name: "Zürich", lat: 47.3769, lng: 8.5417 },
+  "9": { prefix: "9", name: "Ostschweiz", lat: 47.4239, lng: 9.3748 },
+};
+
+export function getCoordsForPLZ(plz: string, country: CountryCode): { lat: number; lng: number, region: string } {
+  const firstDigit = plz.substring(0, 1);
+  const prefix2 = plz.substring(0, 2);
+
+  if (country === 'DE') {
+    if (DE_REGIONS[prefix2]) {
+      return { lat: DE_REGIONS[prefix2].lat, lng: DE_REGIONS[prefix2].lng, region: DE_REGIONS[prefix2].name };
+    }
     const fallback: Record<string, { lat: number, lng: number, name: string }> = { 
       "0": { lat: 51.0, lng: 13.0, name: "Sachsen/Thüringen" }, 
       "1": { lat: 52.5, lng: 13.4, name: "Berlin/Brandenburg" }, 
@@ -124,14 +144,23 @@ export function getCoordsForPLZ(plz: string, country: CountryCode): { lat: numbe
       "8": { lat: 48.0, lng: 11.5, name: "Bayern Süd" }, 
       "9": { lat: 49.5, lng: 11.0, name: "Bayern Nord" } 
     };
-    
     const zone = fallback[firstDigit] || { lat: 51.1, lng: 10.4, name: "Deutschland" };
     return { lat: zone.lat, lng: zone.lng, region: zone.name };
   }
 
-  // AT/CH Fallbacks
-  if (country === 'AT') return { lat: 48.2082, lng: 16.3738, region: "Österreich" };
-  if (country === 'CH') return { lat: 47.3769, lng: 8.5417, region: "Schweiz" };
+  if (country === 'AT') {
+    if (AT_REGIONS[firstDigit]) {
+      return { lat: AT_REGIONS[firstDigit].lat, lng: AT_REGIONS[firstDigit].lng, region: `${AT_REGIONS[firstDigit].name}` };
+    }
+    return { lat: 47.5162, lng: 14.5501, region: "Österreich" };
+  }
+
+  if (country === 'CH') {
+    if (CH_REGIONS[firstDigit]) {
+      return { lat: CH_REGIONS[firstDigit].lat, lng: CH_REGIONS[firstDigit].lng, region: `${CH_REGIONS[firstDigit].name}` };
+    }
+    return { lat: 46.8182, lng: 8.2275, region: "Schweiz" };
+  }
   
   return { lat: 51.1657, lng: 10.4515, region: "Zentraleuropa" };
 }
