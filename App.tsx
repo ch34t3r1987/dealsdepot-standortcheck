@@ -73,10 +73,10 @@ export const App: React.FC = () => {
       setAnalysis(res);
     } catch (err: any) {
       console.error("Fehler in der Analyse:", err);
-      if (err.message === "APIGEM_KEY_MISSING") {
-        setKeyError("Kein API-Key gefunden. Bitte in Vercel als APIGEM_KEY hinterlegen.");
+      if (err.message === "API_KEY_MISSING") {
+        setKeyError("Kein API-Key gefunden. Bitte ein neues Deployment in Vercel starten.");
       } else if (err.message?.includes("API key not valid") || err.status === 400) {
-        setKeyError("Der angegebene APIGEM_KEY ist ungültig oder die Abrechnung im Google Projekt fehlt.");
+        setKeyError("Der API-Key ist ungültig. Prüfe die Billing-Einstellungen im Google AI Studio.");
       } else {
         setAnalysis("Analyse fehlgeschlagen. Bitte versuche es später erneut.");
       }
@@ -219,15 +219,16 @@ export const App: React.FC = () => {
                   
                   <div className="bg-white/80 p-4 rounded-xl border border-gray-100 text-[11px] text-gray-600 space-y-2 shadow-sm">
                     <div className="flex items-center gap-2 text-blue-600 font-bold uppercase tracking-wider">
-                      <Globe size={12} /> Vercel Setup benötigt
+                      <Globe size={12} /> Deployment erforderlich
                     </div>
                     <p>
-                      Bitte hinterlege deinen Key in deinem Vercel Dashboard unter <strong>Settings &gt; Environment Variables</strong>.
+                      Umgebungsvariablen werden bei Vercel erst nach einem <strong>neuen Deployment</strong> aktiv.
                     </p>
-                    <div className="pl-2 border-l-2 border-blue-200 italic">
-                      Variable Name: <code className="bg-gray-100 px-1 rounded text-blue-700">APIGEM_KEY</code>
-                    </div>
-                    <p className="text-[10px]">Vergiss nicht, danach ein neues Deployment zu starten, damit die Variable aktiv wird.</p>
+                    <ol className="list-decimal pl-4 space-y-1">
+                      <li>Gehe in Vercel auf den Tab <strong>Deployments</strong>.</li>
+                      <li>Wähle dein oberstes Deployment und klicke auf die drei Punkte <code className="bg-gray-100 px-1 rounded">...</code></li>
+                      <li>Wähle <strong>Redeploy</strong> aus.</li>
+                    </ol>
                   </div>
                 </div>
               )}
