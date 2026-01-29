@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Map as MapIcon, BarChart3, Info, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2 } from 'lucide-react';
+import { Users, Map as MapIcon, BarChart3, Info, Sparkles, Trash2, Wifi, Settings, X, CheckCircle2, Clock } from 'lucide-react';
 import PLZInput from './components/PLZInput';
 import GermanyMap from './components/GermanyMap';
 import { PLZEntry } from './types';
@@ -25,12 +25,17 @@ const App: React.FC = () => {
         setIsLive(true);
         loadInitialData();
         
-        const subscription = sync.subscribeToChanges((newEntry) => {
-          if (!entriesRef.current.some(e => e.id === newEntry.id)) {
-            setEntries(prev => [newEntry, ...prev]);
-            showToast(`${newEntry.nickname} aus ${newEntry.city} ist beigetreten!`);
+        const subscription = sync.subscribeToChanges(
+          (newEntry) => {
+            if (!entriesRef.current.some(e => e.id === newEntry.id)) {
+              setEntries(prev => [newEntry, ...prev]);
+              showToast(`${newEntry.nickname} aus ${newEntry.city} ist beigetreten!`);
+            }
+          },
+          (deletedId) => {
+            setEntries(prev => prev.filter(e => e.id !== deletedId));
           }
-        });
+        );
 
         return () => {
           subscription?.unsubscribe();
@@ -44,7 +49,7 @@ const App: React.FC = () => {
 
   const loadInitialData = async () => {
     const data = await sync.fetchEntries();
-    if (data.length > 0) setEntries(data);
+    setEntries(data);
   };
 
   const showToast = (msg: string) => {
@@ -55,15 +60,27 @@ const App: React.FC = () => {
   const handleAddEntry = async (entry: PLZEntry) => {
     if (isLive) {
       const success = await sync.pushEntry(entry);
-      if (success) {
-        setEntries(prev => [entry, ...prev]);
-      } else {
-        alert("Fehler beim Speichern in der Cloud. Prüfe deine Konfiguration.");
+      if (!success) {
+        alert("Fehler beim Speichern in der Cloud.");
       }
+      // Hinweis: State Update erfolgt über Realtime Subscription
     } else {
       const newEntries = [entry, ...entries];
       setEntries(newEntries);
       localStorage.setItem('plz-votes', JSON.stringify(newEntries));
+    }
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    if (window.confirm("Möchtest du diesen Eintrag wirklich löschen?")) {
+      if (isLive) {
+        const success = await sync.deleteEntry(id);
+        if (!success) alert("Fehler beim Löschen.");
+      } else {
+        const newEntries = entries.filter(e => e.id !== id);
+        setEntries(newEntries);
+        localStorage.setItem('plz-votes', JSON.stringify(newEntries));
+      }
     }
   };
 
@@ -164,6 +181,36 @@ const App: React.FC = () => {
                 Gib deine PLZ ein und sieh sofort, wo die anderen aus der Gruppe wohnen.
               </p>
               <PLZInput onAdd={handleAddEntry} />
+            </section>
+
+            <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-50 bg-gray-50/50 flex items-center gap-2">
+                <Clock size={18} className="text-gray-400" />
+                <h3 className="font-bold text-gray-700">Letzte Aktivitäten</h3>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                {entries.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 text-sm">Noch keine Einträge vorhanden.</div>
+                ) : (
+                  entries.slice(0, 10).map((entry) => (
+                    <div key={entry.id} className="px-5 py-3 border-b border-gray-50 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-800">{entry.nickname}</span>
+                          <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{entry.code}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">{entry.city} • {new Date(entry.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteEntry(entry.id)}
+                        className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             </section>
 
             <section className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 border border-blue-100 shadow-sm">
