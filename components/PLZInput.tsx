@@ -14,8 +14,8 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nickname.trim()) { setError('Nickname fehlt'); return; }
-    if (plz.length < 4) { setError('PLZ zu kurz'); return; }
+    if (!nickname.trim()) { setError('Anzeigename fehlt'); return; }
+    if (plz.length < 4) { setError('PLZ ist zu kurz'); return; }
 
     const { lat, lng, region } = getCoordsForPLZ(plz, country);
     onAdd({
@@ -34,25 +34,26 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
   };
 
   return (
-    <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <div className="bg-white/5 p-8 rounded-[2rem] border border-white/10 shadow-2xl backdrop-blur-sm">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Dein Anzeigename</label>
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Dein Anzeigename</label>
           <input
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             placeholder="z.B. Markus"
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            className="w-full px-5 py-4 bg-white/5 rounded-2xl border border-white/10 text-white placeholder-gray-600 focus:ring-2 focus:ring-[#32c7a3] focus:border-transparent outline-none transition-all"
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        
+        <div className="grid grid-cols-2 gap-5">
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Land</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Land</label>
             <select
               value={country}
               onChange={(e) => setCountry(e.target.value as CountryCode)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              className="w-full px-5 py-4 bg-[#242424] rounded-2xl border border-white/10 text-white outline-none focus:ring-2 focus:ring-[#32c7a3] transition-all appearance-none cursor-pointer"
             >
               <option value="DE">Deutschland 🇩🇪</option>
               <option value="AT">Österreich 🇦🇹</option>
@@ -60,21 +61,26 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Postleitzahl</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Postleitzahl</label>
             <input
               type="text"
               value={plz}
               onChange={(e) => setPlz(e.target.value.replace(/\D/g, ''))}
-              placeholder="PLZ"
+              placeholder="PLZ eingeben"
               maxLength={5}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              className="w-full px-5 py-4 bg-white/5 rounded-2xl border border-white/10 text-white placeholder-gray-600 focus:ring-2 focus:ring-[#32c7a3] outline-none transition-all"
             />
           </div>
         </div>
-        <button type="submit" className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-[0.98]">
-          Auf der Karte eintragen
+
+        <button 
+          type="submit" 
+          className="w-full py-5 bg-[#32c7a3] text-white rounded-2xl font-black text-lg uppercase tracking-wider hover:brightness-110 shadow-xl shadow-[#32c7a3]/20 transition-all active:scale-[0.98]"
+        >
+          Eintragen
         </button>
-        {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}
+        
+        {error && <p className="text-red-400 text-xs text-center font-bold tracking-wide uppercase">{error}</p>}
       </form>
     </div>
   );
