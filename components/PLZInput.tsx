@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { PLZEntry, CountryCode } from '../types';
 import { geocodePLZ } from '../services/geocoding';
 import { applyJitter } from '../utils/plzData';
-import { Search, MapPin, Loader2, AlertCircle } from 'lucide-react';
+import { Search, MapPin, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 
 interface PLZInputProps {
   onAdd: (entry: PLZEntry) => Promise<boolean>;
@@ -25,6 +25,7 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
     setError('');
 
     try {
+      // Use the high-precision geocoding service
       const geo = await geocodePLZ(plz, country);
       
       if (!geo) {
@@ -33,7 +34,7 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
         return;
       }
 
-      // Kleiner Zufalls-Offset damit Pins nicht exakt stapeln
+      // Small jitter ensures markers for multiple people in same PLZ don't perfectly overlap
       const { lat, lng } = applyJitter(geo.lat, geo.lng, nickname + plz + Math.random());
 
       const success = await onAdd({
@@ -63,7 +64,7 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
   };
 
   return (
-    <div className="bg-white/5 p-8 rounded-[2rem] border border-white/10 shadow-2xl backdrop-blur-sm relative overflow-hidden group">
+    <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/10 shadow-2xl backdrop-blur-sm relative overflow-hidden group">
       <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
         <MapPin size={80} className="text-[#32c7a3]" />
       </div>
@@ -119,8 +120,8 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
         >
           {isLoading ? (
             <>
-              <Loader2 className="animate-spin" />
-              <span>Suche Standort...</span>
+              <Sparkles className="animate-pulse text-white/80" size={20} />
+              <span>Präzise Ortung...</span>
             </>
           ) : 'Eintragen'}
         </button>
