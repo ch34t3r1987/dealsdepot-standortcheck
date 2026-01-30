@@ -2,31 +2,22 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PLZEntry } from '../types';
 
-const DEFAULT_SUPABASE_URL = ''; 
-const DEFAULT_SUPABASE_KEY = ''; 
-
 let supabase: SupabaseClient | null = null;
 
 export const initSupabase = (url: string, key: string) => {
-  if (!url || !key) return null;
+  if (!url || !key || !url.startsWith('http')) return null;
   try {
-    // Falls die URL ungültig ist, wirft createClient evtl. einen Fehler
-    if (!url.startsWith('http')) return null;
     supabase = createClient(url, key);
     return supabase;
   } catch (err) {
-    console.warn("Supabase Init Error:", err);
     return null;
   }
 };
 
 export const getStoredConfig = () => {
-  const localUrl = localStorage.getItem('supabase_url');
-  const localKey = localStorage.getItem('supabase_key');
-
   return {
-    url: localUrl || DEFAULT_SUPABASE_URL,
-    key: localKey || DEFAULT_SUPABASE_KEY
+    url: localStorage.getItem('supabase_url') || '',
+    key: localStorage.getItem('supabase_key') || ''
   };
 };
 
@@ -43,10 +34,7 @@ export const fetchEntries = async (): Promise<PLZEntry[]> => {
       .select('*')
       .order('timestamp', { ascending: false });
     
-    if (error) {
-      console.warn("Fetch Error (Database missing?):", error.message);
-      return [];
-    }
+    if (error) return [];
     return data || [];
   } catch (error) {
     return [];
@@ -56,14 +44,22 @@ export const fetchEntries = async (): Promise<PLZEntry[]> => {
 export const pushEntry = async (entry: PLZEntry): Promise<boolean> => {
   if (!supabase) return false;
   try {
+    // Wir versuchen den Insert. 
+    // Falls die Spalte 'state' in deiner DB fehlt, wird dieser Call fehlschlagen.
     const { error } = await supabase.from('plz_entries').insert([entry]);
+    
     if (error) {
-      console.error("Push Error details:", error);
+      console.error("Supabase Push Error:", error.message);
+      // Wenn der Fehler sagt, dass 'state' fehlt, versuchen wir es ohne 'state'
+      if (error.message.includes("column 'state'") || error.code === 'PGRST204') {
+        const { state, ...entryWithoutState } = entry;
+        const retry = await supabase.from('plz_entries').insert([entryWithoutState]);
+        return !retry.error;
+      }
       return false;
     }
     return true;
   } catch (error) {
-    console.error("Critical Cloud Error:", error);
     return false;
   }
 };
@@ -72,8 +68,7 @@ export const deleteEntry = async (id: string): Promise<boolean> => {
   if (!supabase) return false;
   try {
     const { error } = await supabase.from('plz_entries').delete().eq('id', id);
-    if (error) return false;
-    return true;
+    return !error;
   } catch (error) {
     return false;
   }
@@ -84,7 +79,6 @@ export const subscribeToChanges = (
   onDeletedEntry: (id: string) => void
 ) => {
   if (!supabase) return null;
-  
   try {
     return supabase
       .channel('public:plz_entries')
