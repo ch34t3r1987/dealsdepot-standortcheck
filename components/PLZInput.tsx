@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { PLZEntry, CountryCode } from '../types';
 import { geocodePLZ } from '../services/geocoding';
 import { applyJitter } from '../utils/plzData';
-import { Search, MapPin, Loader2, AlertCircle, Sparkles } from 'lucide-react';
+import { Search, MapPin, AlertCircle, Sparkles } from 'lucide-react';
 
 interface PLZInputProps {
   onAdd: (entry: PLZEntry) => Promise<boolean>;
@@ -19,22 +19,28 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nickname.trim()) { setError('Bitte Namen eingeben'); return; }
-    if (plz.length < 4) { setError('PLZ zu kurz'); return; }
+    
+    // Validierung der Länge basierend auf Land
+    const minLength = country === 'DE' ? 5 : 4;
+    if (plz.length < minLength) { 
+      setError(`PLZ für ${country} muss mindestens ${minLength} Stellen haben`); 
+      return; 
+    }
 
     setIsLoading(true);
     setError('');
 
     try {
-      // Use the high-precision geocoding service
+      // Abfrage der OpenPLZAPI
       const geo = await geocodePLZ(plz, country);
       
       if (!geo) {
-        setError('PLZ nicht gefunden. Bitte prüfen.');
+        setError(`PLZ ${plz} in ${country} nicht gefunden.`);
         setIsLoading(false);
         return;
       }
 
-      // Small jitter ensures markers for multiple people in same PLZ don't perfectly overlap
+      // Kleiner Jitter gegen Overlapping
       const { lat, lng } = applyJitter(geo.lat, geo.lng, nickname + plz + Math.random());
 
       const success = await onAdd({
@@ -57,7 +63,7 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
         setError('Fehler beim Speichern.');
       }
     } catch (err) {
-      setError('Systemfehler. Bitte erneut versuchen.');
+      setError('Verbindung zur Ortung fehlgeschlagen.');
     } finally {
       setIsLoading(false);
     }
@@ -121,13 +127,13 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
           {isLoading ? (
             <>
               <Sparkles className="animate-pulse text-white/80" size={20} />
-              <span>Präzise Ortung...</span>
+              <span>Ortung läuft...</span>
             </>
           ) : 'Eintragen'}
         </button>
         
         {error && (
-          <div className="flex items-center justify-center gap-2 text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20 animate-shake">
+          <div className="flex items-center justify-center gap-2 text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">
             <AlertCircle size={14} />
             <p className="text-[11px] font-black uppercase tracking-tight">{error}</p>
           </div>
