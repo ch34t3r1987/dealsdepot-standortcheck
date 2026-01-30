@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+
+import { useEffect, useRef, useState } from 'react';
 import { PLZEntry } from '../types';
 import { Flame, MapPin } from 'lucide-react';
 
@@ -15,6 +16,12 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
   const heatLayerInstance = useRef<any>(null);
   const [viewMode, setViewMode] = useState<'markers' | 'heatmap'>('markers');
 
+  // Nur valide Einträge mit echten Koordinaten verwenden
+  const validEntries = entries.filter(e => 
+    typeof e.lat === 'number' && !isNaN(e.lat) && 
+    typeof e.lng === 'number' && !isNaN(e.lng)
+  );
+
   useEffect(() => {
     if (!mapContainerRef.current || mapInstance.current) return;
 
@@ -25,7 +32,7 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> Mitwirkende',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19
     }).addTo(mapInstance.current);
 
@@ -50,8 +57,7 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
 
     if (viewMode === 'markers') {
       const counts: Record<string, { count: number; lat: number; lng: number; city?: string; plz: string; nicknames: string[] }> = {};
-      entries.forEach((e) => {
-        // Wir gruppieren nach exakten Koordinaten (da Jitter jetzt klein ist)
+      validEntries.forEach((e) => {
         const key = `${e.lat.toFixed(4)}|${e.lng.toFixed(4)}`;
         if (!counts[key]) {
           counts[key] = { count: 0, lat: e.lat, lng: e.lng, city: e.city, plz: e.code, nicknames: [] };
@@ -75,7 +81,7 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
           .bindPopup(`
             <div class="bg-white text-gray-900 p-2 rounded-lg shadow-xl">
               <div class="font-black text-[#32c7a3] border-b border-gray-100 mb-2 pb-1 text-sm uppercase tracking-wider flex justify-between items-center gap-4">
-                <span>${data.city}</span>
+                <span>${data.city || 'Unbekannt'}</span>
                 <span class="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">${data.plz}</span>
               </div>
               <div class="text-[11px] text-gray-600 font-medium leading-relaxed max-w-[200px]">${data.nicknames.join(', ')}</div>
@@ -84,45 +90,25 @@ export const GermanyMap: React.FC<GermanyMapProps> = ({ entries }) => {
           .addTo(markersLayer.current!);
       });
     } else {
-      if (typeof L.heatLayer === 'function' && entries.length > 0) {
-        const pointMap: Record<string, [number, number, number]> = {};
-        entries.forEach(e => {
-          const key = `${e.lat.toFixed(3)},${e.lng.toFixed(3)}`;
-          if (!pointMap[key]) {
-            pointMap[key] = [e.lat, e.lng, 0];
-          }
-          pointMap[key][2] += 0.4;
-        });
-
-        const heatData = Object.values(pointMap); 
-        
+      if (typeof L.heatLayer === 'function' && validEntries.length > 0) {
+        const heatData = validEntries.map(e => [e.lat, e.lng, 0.5]);
         heatLayerInstance.current = L.heatLayer(heatData, {
           radius: 40,
           blur: 25,
-          maxZoom: 9,
-          max: 1.0,
-          minOpacity: 0.4,
-          gradient: {
-            0.1: '#e5f9f5',
-            0.3: '#b2eddf',
-            0.5: '#65dcc1',
-            0.7: '#32c7a3',
-            0.8: '#f59e0b',
-            1.0: '#ef4444'
-          }
+          maxZoom: 9
         }).addTo(mapInstance.current);
-
-        if (heatLayerInstance.current.redraw) {
-          heatLayerInstance.current.redraw();
-        }
       }
     }
 
-    if (entries.length > 0 && mapInstance.current) {
-      const bounds = L.latLngBounds(entries.map(e => [e.lat, e.lng]));
-      mapInstance.current.fitBounds(bounds.pad(0.3));
+    if (validEntries.length > 0 && mapInstance.current) {
+      try {
+        const bounds = L.latLngBounds(validEntries.map(e => [e.lat, e.lng]));
+        mapInstance.current.fitBounds(bounds.pad(0.3));
+      } catch (e) {
+        console.error("Map Bounds Error:", e);
+      }
     }
-  }, [entries, viewMode]);
+  }, [validEntries.length, viewMode]);
 
   return (
     <div className="bg-white/5 rounded-[2.5rem] shadow-2xl border border-white/10 p-3 h-[600px] lg:h-[700px] relative z-0 backdrop-blur-md">
