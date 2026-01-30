@@ -19,7 +19,7 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nickname.trim()) { setError('Bitte Namen eingeben'); return; }
-    if (plz.length < 4) { setError('PLZ ist zu kurz'); return; }
+    if (plz.length < 4) { setError('PLZ zu kurz'); return; }
 
     setIsLoading(true);
     setError('');
@@ -28,12 +28,13 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
       const geo = await geocodePLZ(plz, country);
       
       if (!geo) {
-        setError('PLZ konnte nicht gefunden werden');
+        setError('PLZ nicht gefunden. Bitte prüfen.');
         setIsLoading(false);
         return;
       }
 
-      const { lat, lng } = applyJitter(geo.lat, geo.lng, nickname + plz);
+      // Kleiner Zufalls-Offset damit Pins nicht exakt stapeln
+      const { lat, lng } = applyJitter(geo.lat, geo.lng, nickname + plz + Math.random());
 
       const success = await onAdd({
         id: Math.random().toString(36).substring(7),
@@ -50,11 +51,12 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
       if (success) {
         setPlz('');
         setNickname('');
+        setError('');
       } else {
-        setError('Datenbank-Fehler (Supabase)');
+        setError('Fehler beim Speichern.');
       }
     } catch (err) {
-      setError('Systemfehler bei der Suche');
+      setError('Systemfehler. Bitte erneut versuchen.');
     } finally {
       setIsLoading(false);
     }
@@ -100,7 +102,7 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
                 type="text"
                 value={plz}
                 onChange={(e) => setPlz(e.target.value.replace(/\D/g, ''))}
-                placeholder="PLZ eingeben..."
+                placeholder="PLZ..."
                 maxLength={5}
                 className="w-full px-5 py-4 bg-white/5 rounded-2xl border border-white/10 text-white placeholder-gray-600 focus:ring-2 focus:ring-[#32c7a3] outline-none transition-all font-bold tracking-widest"
                 disabled={isLoading}
@@ -124,7 +126,7 @@ export const PLZInput: React.FC<PLZInputProps> = ({ onAdd }) => {
         </button>
         
         {error && (
-          <div className="flex items-center justify-center gap-2 text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20 animate-pulse">
+          <div className="flex items-center justify-center gap-2 text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20 animate-shake">
             <AlertCircle size={14} />
             <p className="text-[11px] font-black uppercase tracking-tight">{error}</p>
           </div>
